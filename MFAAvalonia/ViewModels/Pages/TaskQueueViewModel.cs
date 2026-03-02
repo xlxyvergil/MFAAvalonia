@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Collections;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -526,6 +526,52 @@ public partial class TaskQueueViewModel : ViewModelBase
     {
         if (preset?.Task == null) return;
 
+        // 1. 根据预设中的任务列表重建任务顺序与数量：
+        //    - 只保留预设中出现的任务（例如：默认 ABCD，预设只有 AB，则应用后只显示 AB 两个任务）
+        //    - 保留全局资源设置项（IsResourceOptionItem）
+        //    - 保留特殊任务（例如倒计时、自定义系统通知等）
+        var resourceOptionItems = TaskItemViewModels
+            .Where(t => t.IsResourceOptionItem)
+            .ToList();
+
+        var specialTasks = TaskItemViewModels
+            .Where(t => !string.IsNullOrWhiteSpace(t.InterfaceItem?.Entry)
+                && ViewModels.UsersControls.Settings.AddTaskDialogViewModel.SpecialActionNames.Contains(t.InterfaceItem.Entry!))
+            .ToList();
+
+        // 使用 TasksSource 作为模板，保证从 interface 原始定义克隆任务
+        var templateDict = Processor.TasksSource
+            .Where(t => !string.IsNullOrEmpty(t.InterfaceItem?.Name))
+            .GroupBy(t => t.InterfaceItem!.Name!)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // 记录预设中的任务名顺序
+        var presetTaskNames = preset.Task
+            .Where(t => !string.IsNullOrEmpty(t.Name))
+            .Select(t => t.Name!)
+            .ToList();
+
+        // 重新构建 TaskItemViewModels
+        TaskItemViewModels.Clear();
+
+        // 先恢复资源选项项（保持原有顺序）
+        foreach (var item in resourceOptionItems)
+            TaskItemViewModels.Add(item);
+
+        // 再按预设顺序添加任务项
+        foreach (var taskName in presetTaskNames)
+        {
+            if (!templateDict.TryGetValue(taskName, out var templateVm)) continue;
+
+            var cloned = templateVm.Clone();
+            cloned.OwnerViewModel = this;
+            TaskItemViewModels.Add(cloned);
+        }
+
+        // 最后把特殊任务放到列表末尾
+        foreach (var special in specialTasks)
+            TaskItemViewModels.Add(special);
+
         foreach (var presetTask in preset.Task)
         {
             if (string.IsNullOrEmpty(presetTask.Name)) continue;
@@ -542,7 +588,43 @@ public partial class TaskQueueViewModel : ViewModelBase
             {
                 foreach (var (optionName, optionValue) in presetTask.Option)
                 {
+                    // 先在顶级 Option 中按名称查找
                     var selectOption = dragItem.InterfaceItem.Option.FirstOrDefault(o => o.Name == optionName);
+
+                    // 如果不是顶级选项，尝试作为子选项处理：
+                    // 在所有顶级选项的 cases[].option 中查找名称为 optionName 的子选项描述，
+                    // 找到后在对应顶级 selectOption.SubOptions 中创建/获取同名子选项，并应用预设值。
+                    if (selectOption == null)
+                    {
+                        if (MaaProcessor.Interface?.Option != null)
+                        {
+                            foreach (var parentSelect in dragItem.InterfaceItem.Option)
+                            {
+                                if (string.IsNullOrEmpty(parentSelect.Name)) continue;
+
+                                if (!MaaProcessor.Interface.Option.TryGetValue(parentSelect.Name, out var parentOptDef) ||
+                                    parentOptDef.Cases == null) continue;
+
+                                var isChild = parentOptDef.Cases.Any(c =>
+                                    c.Option != null && c.Option.Contains(optionName));
+                                if (!isChild) continue;
+
+                                parentSelect.SubOptions ??= new List<MaaInterface.MaaInterfaceSelectOption>();
+                                selectOption = parentSelect.SubOptions.FirstOrDefault(o => o.Name == optionName);
+                                if (selectOption == null)
+                                {
+                                    selectOption = new MaaInterface.MaaInterfaceSelectOption
+                                    {
+                                        Name = optionName
+                                    };
+                                    TaskLoader.SetDefaultOptionValue(MaaProcessor.Interface, selectOption);
+                                    parentSelect.SubOptions.Add(selectOption);
+                                }
+                                break;
+                            }
+                        }
+                    }
+
                     if (selectOption == null) continue;
 
                     if (MaaProcessor.Interface?.Option?.TryGetValue(optionName, out var interfaceOption) != true) continue;
@@ -554,6 +636,19 @@ public partial class TaskQueueViewModel : ViewModelBase
                             selectOption.SelectedCases = optionValue.ToObject<List<string>>() ?? new List<string>();
                         else if (optionValue.Type == Newtonsoft.Json.Linq.JTokenType.String)
                             selectOption.SelectedCases = new List<string> { optionValue.Value<string>() ?? string.Empty };
+                    }
+                    else if (optionValue.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                    {
+                        // 支持完整的选项对象结构（含子选项），例如：
+                        // { "index": 1, "selected_cases": [...], "data": {...}, "sub_options": [...] }
+                        var fullOption = optionValue.ToObject<MaaInterface.MaaInterfaceSelectOption>();
+                        if (fullOption != null)
+                        {
+                            selectOption.Index = fullOption.Index;
+                            selectOption.SelectedCases = fullOption.SelectedCases;
+                            selectOption.Data = fullOption.Data;
+                            selectOption.SubOptions = fullOption.SubOptions;
+                        }
                     }
                     else if (interfaceOption.IsInput)
                     {
