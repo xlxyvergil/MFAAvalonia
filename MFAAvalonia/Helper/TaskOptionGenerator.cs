@@ -1196,12 +1196,13 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     {
          var grid = new Grid
          {
-             ColumnDefinitions = 
+             ColumnDefinitions =
              {
                  new ColumnDefinition { Width = GridLength.Auto },
                  new ColumnDefinition { Width = GridLength.Star },
                  new ColumnDefinition { Width = GridLength.Auto }
-             }
+             },
+             HorizontalAlignment = HorizontalAlignment.Stretch
          };
          
          var iconDisplay = new DisplayIcon { IconSize = 20, Margin = new Thickness(0,0,6,0), VerticalAlignment = VerticalAlignment.Center };
@@ -1229,14 +1230,17 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
          }
          Grid.SetColumn(textControl, 1);
          
-         var tooltipBlock = new TooltipBlock();
-         tooltipBlock.Bind(TooltipBlock.TooltipTextProperty, new Binding(nameof(caseOption.DisplayDescription)));
-         tooltipBlock.Bind(Visual.IsVisibleProperty, new Binding(nameof(caseOption.HasDescription)));
-         Grid.SetColumn(tooltipBlock, 2);
+         // 只在有描述时添加 TooltipBlock
+         if (caseOption.HasDescription)
+         {
+             var tooltipBlock = new TooltipBlock { Margin = new Thickness(4, 0, 0, 0) };
+             tooltipBlock.Bind(TooltipBlock.TooltipTextProperty, new Binding(nameof(caseOption.DisplayDescription)));
+             Grid.SetColumn(tooltipBlock, 2);
+             grid.Children.Add(tooltipBlock);
+         }
          
          grid.Children.Add(iconDisplay);
          grid.Children.Add(textControl);
-         grid.Children.Add(tooltipBlock);
          
          return grid;
     }
