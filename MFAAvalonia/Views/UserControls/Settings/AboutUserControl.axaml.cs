@@ -60,7 +60,9 @@ public partial class AboutUserControl : UserControl
             catch (Exception ex)
             {
                 LoggerHelper.Error($"清理缓存前停止实例 {processor.InstanceId} 的 Tasker 失败: {ex}");
-                ToastHelper.Error(LangKeys.ClearCacheFailed.ToLocalization(), $"停止实例 {processor.InstanceId} 失败");
+                ToastHelper.Error(
+                    LangKeys.ClearCacheFailed.ToLocalization(),
+                    LangKeys.ClearCacheStopInstanceFailed.ToLocalizationFormatted(false, processor.InstanceId));
                 return;
             }
         }
@@ -69,7 +71,9 @@ public partial class AboutUserControl : UserControl
         if (remainingTasker != null)
         {
             LoggerHelper.Warning($"清理缓存中止：实例 {remainingTasker.InstanceId} 仍存在未释放 Tasker。");
-            ToastHelper.Error(LangKeys.ClearCacheFailed.ToLocalization(), $"实例 {remainingTasker.InstanceId} 仍在占用资源");
+            ToastHelper.Error(
+                LangKeys.ClearCacheFailed.ToLocalization(),
+                LangKeys.ClearCacheInstanceStillUsingResource.ToLocalizationFormatted(false, remainingTasker.InstanceId));
             return;
         }
 
