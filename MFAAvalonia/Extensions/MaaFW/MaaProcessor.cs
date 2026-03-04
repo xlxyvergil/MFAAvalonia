@@ -544,35 +544,15 @@ public class MaaProcessor
                     LanguageHelper.LoadLanguagesFromInterface(value.Languages, AppContext.BaseDirectory);
                 }
 
-                // 使用 ViewModel 属性访问当前 Processor 对应的 VM
-                // 注意：ViewModel 属性会自动创建 VM 如果不存在
-                // 但这里是在 Interface 设置时调用，可能发生在早期
-                // 这里我们假设如果是当前显示的实例切换了 Interface，需要刷新
-                // 但对于多实例，每个实例有自己的 Processor，且 Interface 是静态的？
-                // MaaProcessor.Interface 是静态的！这意味着所有实例共享 Interface 定义。
-                // 只要 Interface 改变，所有实例都应该刷新？
-                // 现在的代码是只刷新了 "Instances.TaskQueueViewModel" (即 Current)。
-                // 这是一个潜在的问题：如果多个实例运行，Interface 是共享的。
-                // 我们暂时维持只刷新 ViewModel（即当前 Processor 的 VM），如果需要可以改为遍历所有实例刷新。
-
-                // 由于 MaaProcessor 实例可能有多个，但这里是在 MaaProcessor 的静态属性 setter 里？
-                // 这里的代码是在 MaaProcessor 实例方法还是静态属性里？
-                // Interface 是静态属性！
-                // 这意味着 MaaProcessor.Interface 设置时，无法访问特定的 ViewModel，除非遍历。
-                // 之前的代码 Instances.TaskQueueViewModel 也是访问单例（或Current）。
-                // 既然 Interface 是全局的，我们应该让所有 VM 刷新 Controller Options？
-                // 或者至少 Current。
-                // 保持原样访问 Current 的 VM 也许是可以的，因为 Interface 改变通常发生在 App 启动或者设置改变，
-                // 如果是全局设置，应该刷新所有。
-
-                // 下面的代码引用了 Instances.TaskQueueViewModel，现在它指向 Current VM。
-                // 我们保留这个行为，或者改为遍历 MaaProcessorManager.Instances 并刷新它们的 VM。
                 if (MaaProcessorManager.IsInstanceCreated)
                 {
                     DispatcherHelper.PostOnMainThread(() =>
                     {
-                        MaaProcessorManager.Instance.Current.ViewModel?.InitializeControllerOptions();
-                        MaaProcessorManager.Instance.Current.ViewModel?.RefreshPresets();
+                        foreach (var processor in Processors)
+                        {
+                            processor.ViewModel?.InitializeControllerOptions();
+                            processor.ViewModel?.RefreshPresets();
+                        }
                         Instances.InstanceTabBarViewModel.RefreshInstancePresets();
                     });
                 }
@@ -691,14 +671,30 @@ public class MaaProcessor
 
     public async Task<MaaTasker?> GetTaskerAsync(CancellationToken token = default)
     {
-        MaaTasker ??= (await InitializeMaaTasker(token)).Item1;
+        if (MaaTasker == null)
+        {
+            var initializedTasker = (await InitializeMaaTasker(token)).Item1;
+            if (initializedTasker != null)
+            {
+                MaaTasker = initializedTasker;
+                // Ensure screenshot tasker is recreated from this processor's latest connection context.
+                DisposeScreenshotTasker();
+                ResetScreencapFailureLogFlags();
+            }
+        }
         return MaaTasker;
     }
 
     public async Task<(MaaTasker?, bool, bool)> GetTaskerAndBoolAsync(CancellationToken token = default)
     {
         var tuple = MaaTasker != null ? (MaaTasker, false, false) : await InitializeMaaTasker(token);
-        MaaTasker ??= tuple.Item1;
+        if (MaaTasker == null && tuple.Item1 != null)
+        {
+            MaaTasker = tuple.Item1;
+            // Ensure screenshot tasker is recreated from this processor's latest connection context.
+            DisposeScreenshotTasker();
+            ResetScreencapFailureLogFlags();
+        }
         return (MaaTasker, tuple.Item2, tuple.Item3);
     }
 
@@ -1754,7 +1750,10 @@ public class MaaProcessor
                     error = LangKeys.FileLoadFailed.ToLocalizationFormatted(false, interfaceFileName);
                     var errorDetail = LangKeys.FileLoadFailedDetail.ToLocalizationFormatted(false, interfaceFileName);
                     // 延迟添加 UI 日志，确保 TaskQueueViewModel 已初始化
-                    MaaProcessorManager.Instance.Current.ViewModel?.AddLog($"error:{error}", (IBrush?)null);
+                    foreach (var processor in Processors)
+                    {
+                        processor.ViewModel?.AddLog($"error:{error}", (IBrush?)null);
+                    }
                     ToastHelper.Error(error, errorDetail, duration: 15);
                 }
             }
@@ -1766,7 +1765,10 @@ public class MaaProcessor
                 {
                     _interfaceLoadErrorShown = true;
                     error = LangKeys.FileLoadFailed.ToLocalizationFormatted(false, interfaceFileName);
-                    MaaProcessorManager.Instance.Current.ViewModel?.AddLog($"error:{error}", (IBrush?)null);
+                    foreach (var processor in Processors)
+                    {
+                        processor.ViewModel?.AddLog($"error:{error}", (IBrush?)null);
+                    }
                     ToastHelper.Error(
                         error,
                         e.Message,
