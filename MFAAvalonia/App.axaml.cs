@@ -144,7 +144,12 @@ public partial class App : Application
 
                 if (GlobalConfiguration.HasFileAccessError)
                 {
-                    var message = $"全局配置文件被占用或无权限访问：{GlobalConfiguration.ConfigPath}\n{GlobalConfiguration.LastFileAccessErrorMessage}";
+                    var reason = (GlobalConfiguration.LastFileAccessErrorMessage ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(reason))
+                    {
+                        reason = "GlobalConfigFileReasonUnknown".ToLocalization();
+                    }
+                    var message = "GlobalConfigFileAccessError".ToLocalizationFormatted(false, GlobalConfiguration.ConfigPath, reason);
                     DispatcherHelper.PostOnMainThread(() =>
                         Instances.DialogManager.CreateDialog()
                             .OfType(NotificationType.Error)
@@ -178,7 +183,12 @@ public partial class App : Application
 
                 if (GlobalConfiguration.HasFileAccessError)
                 {
-                    var message = $"全局配置文件被占用或无权限访问：{GlobalConfiguration.ConfigPath}\n{GlobalConfiguration.LastFileAccessErrorMessage}";
+                    var reason = (GlobalConfiguration.LastFileAccessErrorMessage ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(reason))
+                    {
+                        reason = "GlobalConfigFileReasonUnknown".ToLocalization();
+                    }
+                    var message = "GlobalConfigFileAccessError".ToLocalizationFormatted(false, GlobalConfiguration.ConfigPath, reason);
                     DispatcherHelper.PostOnMainThread(() =>
                         Instances.DialogManager.CreateDialog()
                             .OfType(NotificationType.Error)

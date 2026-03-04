@@ -2,7 +2,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MFAAvalonia.Extensions;
 using System;
-using System.Collections.Generic;
 
 namespace MFAAvalonia.Helper.ValueType;
 
@@ -26,10 +25,16 @@ public partial class MFAHotKey : ObservableObject
     [ObservableProperty] private bool _isTip;
     [ObservableProperty] private KeyGesture? _gesture;
     [ObservableProperty] private string _resourceKey;
+    [ObservableProperty] private string[] _resourceArgsKeys = Array.Empty<string>();
     partial void OnResourceKeyChanged(string value)
     {
         UpdateName();
 
+    }
+    
+    partial void OnResourceArgsKeysChanged(string[] value)
+    {
+        UpdateName();
     }
 
     public MFAHotKey(bool isTip = false)
@@ -49,7 +54,11 @@ public partial class MFAHotKey : ObservableObject
 
     public void UpdateName()
     {
-        Name = IsTip ? ResourceKey.ToLocalization() : (Gesture?.ToString() ?? "");
+        Name = IsTip
+            ? (ResourceArgsKeys.Length > 0
+                ? ResourceKey.ToLocalizationFormatted(true, ResourceArgsKeys)
+                : ResourceKey.ToLocalization())
+            : (Gesture?.ToString() ?? "");
     }
 
     // 保留 Equals/GetHashCode 等核心逻辑（修改为比较 KeyGesture）

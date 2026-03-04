@@ -17,6 +17,7 @@ namespace MFAAvalonia.Helper;
 public static class GlobalHotkeyService
 {
     private static readonly ConcurrentDictionary<HotkeyIdentifier, ICommand> _commands = new();
+    private static readonly ConcurrentDictionary<HotkeyIdentifier, string> _owners = new();
     private static IGlobalHook? _hook;
     private static HotkeyPrimaryElection? _election;
     private static HotkeyIpcServer? _server;
@@ -186,18 +187,22 @@ public static class GlobalHotkeyService
         return new HotkeyIdentifier(k, n);
     }
 
-    public static bool Register(KeyGesture? g, ICommand c)
+    public static bool Register(KeyGesture? g, ICommand c, string? ownerResourceKey, out string? occupiedByOwnerResourceKey)
     {
+        occupiedByOwnerResourceKey = null;
         if (g == null || c == null) return true;
         var (k, m) = Convert(g);
         var h = new HotkeyIdentifier(k, m);
         LoggerHelper.Info($"Register Hotkey[{h}]");
         if (_commands.TryAdd(h, c))
         {
+            if (!string.IsNullOrWhiteSpace(ownerResourceKey))
+                _owners[h] = ownerResourceKey;
             if (_client?.IsConnected == true) _ = _client.RegisterHotkeyAsync(h);
             SaveState();
             return true;
         }
+        _owners.TryGetValue(h, out occupiedByOwnerResourceKey);
         return false;
     }
 
@@ -208,6 +213,7 @@ public static class GlobalHotkeyService
         var h = new HotkeyIdentifier(k, m);
         if (_commands.TryRemove(h, out _))
         {
+            _owners.TryRemove(h, out _);
             if (_client?.IsConnected == true) _ = _client.UnregisterHotkeyAsync(h);
             SaveState();
         }
@@ -233,6 +239,7 @@ public static class GlobalHotkeyService
         _election?.Dispose();
         _election = null;
         _commands.Clear();
+        _owners.Clear();
         IsStopped = true;
         IsEnabled = false;
         HotkeyPrimaryElection.ClearState();

@@ -564,8 +564,20 @@
     <data name="HotKeyOccupiedWarning" xml:space="preserve">
         <value>⚠️ 該快速鍵已被佔用</value>
     </data>
+    <data name="HotKeyOccupiedBy" xml:space="preserve">
+        <value>⚠️ 該快速鍵已被 {0} 佔用</value>
+    </data>
     <data name="HotKeyPressing" xml:space="preserve">
         <value>按下任意組合鍵...</value>
+    </data>
+    <data name="UnknownItem" xml:space="preserve">
+        <value>未知項</value>
+    </data>
+    <data name="GlobalConfigFileAccessError" xml:space="preserve">
+        <value>全域配置檔無法存取：{0}\n佔用/錯誤詳情：{1}</value>
+    </data>
+    <data name="GlobalConfigFileReasonUnknown" xml:space="preserve">
+        <value>未知原因</value>
     </data>
     <data name="HotKeySettings" xml:space="preserve">
         <value>快速鍵設定</value>

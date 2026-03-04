@@ -36,10 +36,11 @@ public partial class SettingsViewModel : ViewModelBase
         _hotkeysInitialized = true;
 
         SetHotKey(ref _hotKeyShowGui, _hotKeyShowGui, ConfigurationKeys.ShowGui,
-            Instances.RootViewModel.ToggleVisibleCommand);
+            Instances.RootViewModel.ToggleVisibleCommand, LangKeys.HotKeyShowGui);
 
         SetHotKey(ref _hotKeyLinkStart, _hotKeyLinkStart, ConfigurationKeys.LinkStart,
-            new RelayCommand(() => Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel?.ToggleCommand.Execute(null)));
+            new RelayCommand(() => Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel?.ToggleCommand.Execute(null)),
+            LangKeys.HotKeyLinkStart);
     }
 
     #region 多开实例管理
@@ -110,7 +111,8 @@ public partial class SettingsViewModel : ViewModelBase
     public MFAHotKey HotKeyShowGui
     {
         get => _hotKeyShowGui;
-        set => SetHotKey(ref _hotKeyShowGui, value, ConfigurationKeys.ShowGui, Instances.RootViewModel.ToggleVisibleCommand);
+        set => SetHotKey(ref _hotKeyShowGui, value, ConfigurationKeys.ShowGui, Instances.RootViewModel.ToggleVisibleCommand,
+            LangKeys.HotKeyShowGui);
     }
 
     private MFAHotKey _hotKeyLinkStart = MFAHotKey.NOTSET;
@@ -118,16 +120,22 @@ public partial class SettingsViewModel : ViewModelBase
     public MFAHotKey HotKeyLinkStart
     {
         get => _hotKeyLinkStart;
-        set => SetHotKey(ref _hotKeyLinkStart, value, ConfigurationKeys.LinkStart, new RelayCommand(() => Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel?.ToggleCommand.Execute(null)));
+        set => SetHotKey(ref _hotKeyLinkStart, value, ConfigurationKeys.LinkStart,
+            new RelayCommand(() => Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel?.ToggleCommand.Execute(null)),
+            LangKeys.HotKeyLinkStart);
     }
 
-    public void SetHotKey(ref MFAHotKey value, MFAHotKey? newValue, string type, ICommand command)
+    public void SetHotKey(ref MFAHotKey value, MFAHotKey? newValue, string type, ICommand command, string ownerResourceKey)
     {
         if (newValue != null)
         {
-            if (!GlobalHotkeyService.Register(newValue.Gesture, command))
+            if (!GlobalHotkeyService.Register(newValue.Gesture, command, ownerResourceKey, out var occupiedBy))
             {
-                newValue = MFAHotKey.ERROR;
+                newValue = new MFAHotKey(true)
+                {
+                    ResourceKey = "HotKeyOccupiedBy",
+                    ResourceArgsKeys = [occupiedBy ?? "UnknownItem"]
+                };
             }
             GlobalConfiguration.SetValue(type, newValue.ToString());
             SetProperty(ref value, newValue);

@@ -573,8 +573,20 @@
     <data name="HotKeyOccupiedWarning" xml:space="preserve">
         <value>⚠️ 该热键已被占用</value>
     </data>
+    <data name="HotKeyOccupiedBy" xml:space="preserve">
+        <value>⚠️ 该热键已被 {0} 占用</value>
+    </data>
     <data name="HotKeyPressing" xml:space="preserve">
         <value>按下任意组合键...</value>
+    </data>
+    <data name="UnknownItem" xml:space="preserve">
+        <value>未知项</value>
+    </data>
+    <data name="GlobalConfigFileAccessError" xml:space="preserve">
+        <value>全局配置文件无法访问：{0}\n占用/错误详情：{1}</value>
+    </data>
+    <data name="GlobalConfigFileReasonUnknown" xml:space="preserve">
+        <value>未知原因</value>
     </data>
     <data name="HotKeySettings" xml:space="preserve">
         <value>热键设置</value>
