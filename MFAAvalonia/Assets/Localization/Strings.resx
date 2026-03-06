@@ -1600,7 +1600,7 @@
         <value>重命名</value>
     </data>
     <data name="TaskRenamePlaceholder" xml:space="preserve">
-        <value>输入自定义显示名称（可选）</value>
+        <value>输入配置名称</value>
     </data>
     <data name="TaskRemark" xml:space="preserve">
         <value>备注</value>

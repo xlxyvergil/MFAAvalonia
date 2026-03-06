@@ -62,7 +62,7 @@
                 Text="{markup:I18n {x:Static helper:LangKeys.EditTaskDialog_TaskName_Title}}" />
             <TextBox
                 Classes="rename-input"
-                Text="{Binding Name}"
+                Text="{Binding Name, Mode=TwoWay}"
                 Watermark="{markup:I18n {x:Static helper:LangKeys.TaskRenamePlaceholder}}" />
         </StackPanel>
 

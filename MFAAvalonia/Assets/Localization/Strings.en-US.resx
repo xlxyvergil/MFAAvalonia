@@ -1590,7 +1590,7 @@
         <value>Rename</value>
     </data>
     <data name="TaskRenamePlaceholder" xml:space="preserve">
-        <value>Enter a custom display name (optional)</value>
+        <value>Enter configuration name</value>
     </data>
     <data name="TaskRemark" xml:space="preserve">
         <value>Remark</value>

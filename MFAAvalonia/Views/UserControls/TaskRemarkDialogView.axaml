@@ -62,7 +62,7 @@
                 Text="{markup:I18n {x:Static helper:LangKeys.TaskRemark}}" />
             <TextBox
                 Classes="remark-input"
-                Text="{Binding Remark}"
+                Text="{Binding Remark, Mode=TwoWay}"
                 Watermark="{markup:I18n {x:Static helper:LangKeys.TaskRemarkPlaceholder}}" />
         </StackPanel>
 

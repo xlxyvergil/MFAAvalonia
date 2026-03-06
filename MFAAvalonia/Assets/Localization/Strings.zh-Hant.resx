@@ -1578,7 +1578,7 @@
         <value>重新命名</value>
     </data>
     <data name="TaskRenamePlaceholder" xml:space="preserve">
-        <value>輸入自訂顯示名稱（可選）</value>
+        <value>輸入設定名稱</value>
     </data>
     <data name="TaskRemark" xml:space="preserve">
         <value>備註</value>
