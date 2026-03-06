@@ -924,6 +924,13 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         return grid;
     }
 
+    private Grid CreateSpecialTaskGrid(bool isFirstRow = false)
+    {
+        var grid = CreateBaseGrid();
+        grid.Margin = isFirstRow ? new Thickness(10, 6, 10, 6) : new Thickness(10, 3, 10, 3);
+        return grid;
+    }
+
     private StackPanel CreateLabelPanel(string displayName, string? name, string? description, List<string>? document = null, bool isResourceBinding = false, bool useI18n = false)
     {
         var stackPanel = new StackPanel
@@ -1329,8 +1336,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     private void AddCountdownOptions(StackPanel panel, DragItemViewModel dragItem)
     {
         var param = GetActionParam(dragItem);
-        var grid = CreateBaseGrid();
-        grid.Margin = new Thickness(1, 10, 10, 3);
+        var grid = CreateSpecialTaskGrid(isFirstRow: true);
 
         var label = CreateLabelPanel(LangKeys.SpecialTask_CountdownSeconds, null, null, useI18n: true);
         label.Margin = new Thickness(10, 0, 0, 0);
@@ -1344,7 +1350,6 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
             Maximum = 86400,
             Increment = 1,
             MinWidth = 120,
-            Height = 30,
             Margin = new Thickness(0, 2, 0, 2),
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -1369,8 +1374,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     private void AddTimedWaitOptions(StackPanel panel, DragItemViewModel dragItem)
     {
         var param = GetActionParam(dragItem);
-        var grid = CreateBaseGrid();
-        grid.Margin = new Thickness(1, 10, 10, 3);
+        var grid = CreateSpecialTaskGrid(isFirstRow: true);
 
         var label = CreateLabelPanel(LangKeys.SpecialTask_WaitUntilTime, null, null, useI18n: true);
         label.Margin = new Thickness(10, 0, 0, 0);
@@ -1385,8 +1389,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
             ClockIdentifier = "24HourClock",
             SelectedTime = new TimeSpan(hour, minute, 0),
             MinWidth = 120,
-            Height = 30,
-            Margin = new Thickness(0, 2, 4, 2),
+            Margin = new Thickness(0, 2, 0, 2),
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Classes = { "TaskOptionLikeCombo" },
@@ -1415,7 +1418,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         var param = GetActionParam(dragItem);
 
         // 标题
-        var grid1 = CreateBaseGrid();
+        var grid1 = CreateSpecialTaskGrid(isFirstRow: true);
         var label1 = CreateLabelPanel(LangKeys.SpecialTask_NotificationTitle, null, null, useI18n: true);
         label1.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label1, 0);
@@ -1440,7 +1443,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         panel.Children.Add(grid1);
 
         // 内容
-        var grid2 = CreateBaseGrid();
+        var grid2 = CreateSpecialTaskGrid();
         var label2 = CreateLabelPanel(LangKeys.SpecialTask_NotificationContent, null, null, useI18n: true);
         label2.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label2, 0);
@@ -1476,7 +1479,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         var param = GetActionParam(dragItem);
 
         // 程序路径
-        var grid1 = CreateBaseGrid();
+        var grid1 = CreateSpecialTaskGrid(isFirstRow: true);
         var label1 = CreateLabelPanel(LangKeys.SpecialTask_ProgramPath, null, null, useI18n: true);
         label1.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label1, 0);
@@ -1553,7 +1556,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         panel.Children.Add(grid1);
 
         // 附加参数
-        var grid2 = CreateBaseGrid();
+        var grid2 = CreateSpecialTaskGrid();
         var label2 = CreateLabelPanel(LangKeys.SpecialTask_Arguments, null, null, useI18n: true);
         label2.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label2, 0);
@@ -1619,7 +1622,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     private void AddKillProcessOptions(StackPanel panel, DragItemViewModel dragItem)
     {
         var param = GetActionParam(dragItem);
-        var grid = CreateBaseGrid();
+        var grid = CreateSpecialTaskGrid(isFirstRow: true);
 
         var label = CreateLabelPanel(LangKeys.SpecialTask_ProcessName, null, null, useI18n: true);
         label.Margin = new Thickness(10, 0, 0, 0);
@@ -1653,7 +1656,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     private void AddComputerOperationOptions(StackPanel panel, DragItemViewModel dragItem)
     {
         var param = GetActionParam(dragItem);
-        var grid = CreateBaseGrid();
+        var grid = CreateSpecialTaskGrid(isFirstRow: true);
 
         var label = CreateLabelPanel(LangKeys.SpecialTask_OperationType, null, null, useI18n: true);
         label.Margin = new Thickness(10, 0, 0, 0);
@@ -1701,7 +1704,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         var param = GetActionParam(dragItem);
 
         // URL
-        var grid1 = CreateBaseGrid();
+        var grid1 = CreateSpecialTaskGrid(isFirstRow: true);
         var label1 = CreateLabelPanel("URL", null, null);
         label1.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label1, 0);
@@ -1727,7 +1730,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         panel.Children.Add(grid1);
 
         // Method
-        var grid2 = CreateBaseGrid();
+        var grid2 = CreateSpecialTaskGrid();
         var label2 = CreateLabelPanel(LangKeys.SpecialTask_RequestMethod, null, null, useI18n: true);
         label2.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label2, 0);
@@ -1757,7 +1760,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         panel.Children.Add(grid2);
 
         // Body
-        var grid3 = CreateBaseGrid();
+        var grid3 = CreateSpecialTaskGrid();
         var label3 = CreateLabelPanel(LangKeys.SpecialTask_RequestBody, null, null, useI18n: true);
         label3.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label3, 0);
@@ -1785,7 +1788,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         panel.Children.Add(grid3);
 
         // Content-Type
-        var grid4 = CreateBaseGrid();
+        var grid4 = CreateSpecialTaskGrid();
         var label4 = CreateLabelPanel("Content-Type", null, null);
         label4.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label4, 0);
