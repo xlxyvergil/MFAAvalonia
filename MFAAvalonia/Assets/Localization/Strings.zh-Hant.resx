@@ -574,7 +574,7 @@
         <value>⚠️ 該快速鍵已被 {0} 佔用</value>
     </data>
     <data name="HotKeyPressing" xml:space="preserve">
-        <value>按下任意組合鍵...</value>
+        <value>按下任意鍵...</value>
     </data>
     <data name="UnknownItem" xml:space="preserve">
         <value>未知項</value>

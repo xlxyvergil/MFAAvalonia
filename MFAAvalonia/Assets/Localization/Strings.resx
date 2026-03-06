@@ -583,7 +583,7 @@
         <value>⚠️ 该热键已被 {0} 占用</value>
     </data>
     <data name="HotKeyPressing" xml:space="preserve">
-        <value>按下任意组合键...</value>
+        <value>按下任意键...</value>
     </data>
     <data name="UnknownItem" xml:space="preserve">
         <value>未知项</value>

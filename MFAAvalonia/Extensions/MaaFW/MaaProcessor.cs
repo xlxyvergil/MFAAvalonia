@@ -42,6 +42,8 @@ public class MaaProcessor
 {
     #region 属性
 
+    public const string ConnectionFailedAfterAllRetriesMessage = "Connection failed after all retries";
+
     private static readonly Random Random = new();
     private int _taskQueueTotal;
     private readonly BlockingCollection<Func<Task>> _commandQueue = new();
@@ -2997,7 +2999,7 @@ public class MaaProcessor
             {
                 if (!tuple.Item2 && shouldRetry)
                     HandleConnectionFailureAsync(controllerType, token);
-                throw new Exception("Connection failed after all retries");
+                throw new Exception(ConnectionFailedAfterAllRetriesMessage);
             }
 
             ViewModel?.SetConnected(true);

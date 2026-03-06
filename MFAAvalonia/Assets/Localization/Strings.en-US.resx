@@ -574,7 +574,7 @@
         <value>⚠️ This hotkey is already used by {0}</value>
     </data>
     <data name="HotKeyPressing" xml:space="preserve">
-        <value>Press any combination...</value>
+        <value>Press any key...</value>
     </data>
     <data name="UnknownItem" xml:space="preserve">
         <value>Unknown item</value>

@@ -124,8 +124,21 @@ public partial class MonitorItemViewModel : ViewModelBase
     [RelayCommand]
     private async Task Connect()
     {
-        await Processor.ReconnectAsync();
-        UpdateInfo();
+        try
+        {
+            await Processor.ReconnectAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex.Message == MaaProcessor.ConnectionFailedAfterAllRetriesMessage)
+        {
+            LoggerHelper.Warning($"Monitor reconnect failed: {ex.Message}");
+        }
+        finally
+        {
+            UpdateInfo();
+        }
     }
 
     [RelayCommand]
