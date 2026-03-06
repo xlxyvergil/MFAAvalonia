@@ -64,6 +64,8 @@
                                                         
                                                         IsVisible="{TemplateBinding IsMenuExpanded}" />
 
+                                        <ContentPresenter Content="{TemplateBinding FooterActionsContent}" />
+
                                         <ItemsControl Margin="0,0,0,4"
                                                       ItemsSource="{TemplateBinding FooterMenuItems}">
                                         </ItemsControl>

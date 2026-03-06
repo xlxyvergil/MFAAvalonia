@@ -3,14 +3,17 @@
     x:DataType="windows:RootViewModel"
     xmlns="https://github.com/avaloniaui"
     xmlns:calcBinding="clr-namespace:CalcBinding;assembly=CalcBindingAva"
+    xmlns:converters="clr-namespace:MFAAvalonia.Helper.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:extensions="clr-namespace:MFAAvalonia.Extensions"
     xmlns:fluent="clr-namespace:FluentIcons.Avalonia.Fluent.Markup;assembly=FluentIcons.Avalonia.Fluent"
+    xmlns:fluentIcon="clr-namespace:FluentIcons.Avalonia.Fluent;assembly=FluentIcons.Avalonia.Fluent"
     xmlns:helper="clr-namespace:MFAAvalonia.Helper"
     xmlns:markup="https://codewf.com"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:pages="clr-namespace:MFAAvalonia.Views.Pages"
     xmlns:suki="https://github.com/kikipoulet/SukiUI"
+    xmlns:styling="clr-namespace:Avalonia.Styling;assembly=Avalonia.Base"
     xmlns:windows="clr-namespace:MFAAvalonia.ViewModels.Windows"
     xmlns:controls="clr-namespace:MFAAvalonia.Views.UserControls"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -22,6 +25,15 @@
     </Design.DataContext>
 
     <Grid>
+        <Grid.Styles>
+            <Style Selector="ToggleButton#ThemeModeToggle:pointerover">
+                <Setter Property="Background" Value="{DynamicResource SukiPrimaryColor5}" />
+            </Style>
+            <Style Selector="ToggleButton#ThemeModeToggle:pointerover fluentIcon|FluentIcon#ThemeModeIcon">
+                <Setter Property="RenderTransform" Value="scale(1.12)" />
+            </Style>
+        </Grid.Styles>
+
         <LayoutTransformControl
             LayoutTransform="{Binding ScaleTransform, Source={x:Static helper:FontService.Instance}}">
             <Grid RowDefinitions="*">
@@ -61,6 +73,33 @@
                     <suki:SukiSideMenu.HeaderContent>
                         <!-- Header Content -->
                     </suki:SukiSideMenu.HeaderContent>
+
+                    <suki:SukiSideMenu.FooterActionsContent>
+                        <ToggleButton x:Name="ThemeModeToggle"
+                                      Margin="3,2,3,6"
+                                      Width="40"
+                                      Height="40"
+                                      HorizontalAlignment="Left"
+                                      HorizontalContentAlignment="Center"
+                                      VerticalContentAlignment="Center"
+                                      Padding="0"
+                                      Classes="Basic"
+                                      Checked="ThemeModeToggle_OnChecked"
+                                      Unchecked="ThemeModeToggle_OnUnchecked"
+                                      IsChecked="{Binding BaseTheme, Source={x:Static helper:Instances.GuiSettingsUserControlModel}, Converter={converters:UniversalEqualityConverter}, ConverterParameter={x:Static styling:ThemeVariant.Dark}, Mode=OneWay}">
+                            <fluentIcon:FluentIcon x:Name="ThemeModeIcon"
+                                                   Icon="WeatherMoon"
+                                                   IconVariant="Regular"
+                                                   IconSize="Size20"
+                                                   Foreground="{DynamicResource SukiText}">
+                                <fluentIcon:FluentIcon.Transitions>
+                                    <Transitions>
+                                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" />
+                                    </Transitions>
+                                </fluentIcon:FluentIcon.Transitions>
+                            </fluentIcon:FluentIcon>
+                        </ToggleButton>
+                    </suki:SukiSideMenu.FooterActionsContent>
 
                     <suki:SukiSideMenu.FooterMenuItems>
                         <suki:SukiSideMenuItem IsContentMovable="False"

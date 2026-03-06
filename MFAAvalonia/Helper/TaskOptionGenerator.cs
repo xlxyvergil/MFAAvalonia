@@ -1325,6 +1325,7 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     {
         var param = GetActionParam(dragItem);
         var grid = CreateBaseGrid();
+        grid.Margin = new Thickness(1, 10, 10, 3);
 
         var label = CreateLabelPanel(LangKeys.SpecialTask_CountdownSeconds, null, null, useI18n: true);
         label.Margin = new Thickness(10, 0, 0, 0);
@@ -1338,8 +1339,11 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
             Maximum = 86400,
             Increment = 1,
             MinWidth = 120,
+            Height = 30,
             Margin = new Thickness(0, 2, 0, 2),
             VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Classes = { "TaskOptionLikeCombo" },
         };
         BindIdleEnabled(numericUpDown);
         numericUpDown.ValueChanged += (_, _) =>
@@ -1360,19 +1364,11 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     private void AddTimedWaitOptions(StackPanel panel, DragItemViewModel dragItem)
     {
         var param = GetActionParam(dragItem);
-        var grid = new Grid
-        {
-            ColumnDefinitions =
-            {
-                new ColumnDefinition { Width = GridLength.Auto },
-                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) },
-                new ColumnDefinition { Width = GridLength.Auto },
-            },
-            Margin = new Thickness(10, 3, 10, 3),
-        };
+        var grid = CreateBaseGrid();
+        grid.Margin = new Thickness(1, 10, 10, 3);
 
         var label = CreateLabelPanel(LangKeys.SpecialTask_WaitUntilTime, null, null, useI18n: true);
-        label.Margin = new Thickness(10, 0, 5, 0);
+        label.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(label, 0);
         grid.Children.Add(label);
 
@@ -1383,14 +1379,16 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         {
             ClockIdentifier = "24HourClock",
             SelectedTime = new TimeSpan(hour, minute, 0),
-            Height = 35,
-            Width = 205,
+            MinWidth = 120,
+            Height = 30,
+            Margin = new Thickness(0, 2, 4, 2),
             VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Right,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Classes = { "TaskOptionLikeCombo" },
         };
         BindIdleEnabled(timePicker);
 
-        timePicker.SelectedTimeChanged += (_, e) =>
+        timePicker.SelectedTimeChanged += (_, _) =>
         {
             var time = timePicker.SelectedTime ?? TimeSpan.Zero;
             param["hour"] = time.Hours;
@@ -1398,7 +1396,8 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
             UpdateActionParam(dragItem, param);
         };
 
-        Grid.SetColumn(timePicker, 2);
+        Grid.SetColumn(timePicker, 1);
+        AddResponsiveBehavior(grid, label, timePicker);
         grid.Children.Add(timePicker);
         panel.Children.Add(grid);
     }

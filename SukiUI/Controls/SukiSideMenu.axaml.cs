@@ -153,6 +153,15 @@ public class SukiSideMenu : TreeView
         set => SetValue(FooterContentProperty, value);
     }
 
+    public static readonly StyledProperty<object?> FooterActionsContentProperty =
+        AvaloniaProperty.Register<SukiSideMenu, object?>(nameof(FooterActionsContent));
+
+    public object? FooterActionsContent
+    {
+        get => GetValue(FooterActionsContentProperty);
+        set => SetValue(FooterActionsContentProperty, value);
+    }
+
     public static readonly StyledProperty<ObservableCollection<SukiSideMenuItem>> FooterMenuItemsProperty =
         AvaloniaProperty.Register<SukiSideMenu, ObservableCollection<SukiSideMenuItem>>(
             nameof(FooterMenuItems),

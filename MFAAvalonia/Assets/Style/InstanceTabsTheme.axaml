@@ -276,7 +276,7 @@
                         <Button Name="PART_OverflowButton"
                                 Theme="{StaticResource DropdownToggleButton}"
                                 VerticalAlignment="Center"
-                                Margin="4,0,2,4"
+                                Margin="8,0,2,4"
                                 IsVisible="False">
                             <TextBlock Name="PART_OverflowText"
                                        FontSize="11"

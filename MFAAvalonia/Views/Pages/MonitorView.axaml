@@ -14,6 +14,23 @@
              x:Name="RootMonitorView"
              x:Class="MFAAvalonia.Views.Pages.MonitorView"
              x:DataType="pages:MonitorViewModel">
+    <UserControl.Styles>
+        <Style Selector="Ellipse.RunningPulse">
+            <Style.Animations>
+                <Animation Duration="0:0:1.5" IterationCount="INFINITE" Easing="CubicEaseInOut">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="1" />
+                    </KeyFrame>
+                    <KeyFrame Cue="50%">
+                        <Setter Property="Opacity" Value="0.4" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
     <Grid>
         <ScrollViewer>
         <ItemsControl ItemsSource="{Binding Items}">
@@ -121,10 +138,28 @@
                             <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
                                 <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis"/>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource SukiSuccessColor}" IsVisible="{Binding IsConnected}"/>
-                                    <Ellipse Width="8" Height="8" Fill="{DynamicResource SukiDangerColor}" IsVisible="{Binding !IsConnected}"/>
-                                    <TextBlock Text="{markup:I18n {x:Static helper:LangKeys.Connected}}" IsVisible="{Binding IsConnected}" FontSize="12" Foreground="{DynamicResource SukiLowText}"/>
-                                    <TextBlock Text="{markup:I18n {x:Static helper:LangKeys.Unconnected}}" IsVisible="{Binding !IsConnected}" FontSize="12" Foreground="{DynamicResource SukiLowText}"/>
+                                    <Ellipse Width="8" Height="8"
+                                             Fill="{DynamicResource SukiSuccessColor}"
+                                             IsVisible="{Binding IsRunning}"
+                                             Classes="RunningPulse" />
+                                    <Ellipse Width="8" Height="8"
+                                             Fill="{DynamicResource SukiSuccessColor}"
+                                             IsVisible="{calcBinding:Binding '!IsRunning and IsConnected'}" />
+                                    <Ellipse Width="8" Height="8"
+                                             Fill="{DynamicResource SukiDangerColor}"
+                                             IsVisible="{calcBinding:Binding '!IsRunning and !IsConnected'}" />
+                                    <TextBlock Text="{markup:I18n {x:Static helper:LangKeys.Running}}"
+                                               IsVisible="{Binding IsRunning}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource SukiLowText}" />
+                                    <TextBlock Text="{markup:I18n {x:Static helper:LangKeys.Connected}}"
+                                               IsVisible="{calcBinding:Binding '!IsRunning and IsConnected'}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource SukiLowText}" />
+                                    <TextBlock Text="{markup:I18n {x:Static helper:LangKeys.Unconnected}}"
+                                               IsVisible="{calcBinding:Binding '!IsRunning and !IsConnected'}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource SukiLowText}" />
                                 </StackPanel>
                             </Grid>
                         </Grid>

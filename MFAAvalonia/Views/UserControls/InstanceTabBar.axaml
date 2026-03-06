@@ -100,6 +100,11 @@
         <Style Selector="controls|InstanceTabsControl /template/ Button#PART_AddItemButton">
             <Setter Property="ToolTip.Tip" Value="{markup:I18n {x:Static helper:LangKeys.InstanceAddTooltip}}" />
         </Style>
+        <!-- 标签项 tooltip 绑定到容器本身，避免被模板内拖拽层拦截 -->
+        <Style Selector="controls|InstanceTabsControl controls|DragTabItem">
+            <Setter Property="ToolTip.Tip" Value="{ReflectionBinding Name}" />
+            <Setter Property="ToolTip.ShowDelay" Value="100" />
+        </Style>
         <!-- 预设菜单项按钮样式（与 DropdownItem 保持一致） -->
         <!-- 预设菜单项按钮样式 -->
         <Style Selector="Button.PresetMenuItem">
@@ -205,8 +210,7 @@
                                        Text="{Binding Name}"
                                        VerticalAlignment="Center"
                                        TextWrapping="NoWrap"
-                                       TextTrimming="CharacterEllipsis"
-                                       ToolTip.Tip="{Binding Name}" />
+                                       TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </DataTemplate>
                 </controls:InstanceTabsControl.ItemTemplate>
