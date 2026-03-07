@@ -1,9 +1,9 @@
 ﻿
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using MFAAvalonia.Helper;
 using MFAAvalonia.ViewModels.UsersControls.Settings;
 using SukiUI.Models;
-using TextMateSharp.Themes;
 
 namespace MFAAvalonia.ViewModels.Other;
 
@@ -17,5 +17,12 @@ public partial class ThemeItemViewModel(SukiColorTheme theme, GuiSettingsUserCon
     {
         if (value)
             Instances.GuiSettingsUserControlModel.CurrentColorTheme = Theme;
+    }
+
+    [RelayCommand]
+    private void SelectTheme()
+    {
+        if (!IsSelected)
+            IsSelected = true;
     }
 }
