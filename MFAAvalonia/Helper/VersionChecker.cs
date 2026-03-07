@@ -674,8 +674,30 @@ public static class VersionChecker
         // 通过程序集名称检测解压目录中是否包含新版本的 MFAAvalonia 可执行文件
         var newMFAExe = FindMFAExecutableByAssemblyName(tempExtractDir);
         var containsMFAExecutable = !string.IsNullOrEmpty(newMFAExe);
+        string newMFAExeTargetPath = string.Empty;
         if (containsMFAExecutable)
+        {
+            newMFAExeTargetPath = Path.Combine(wpfDir, Path.GetFileName(newMFAExe));
             LoggerHelper.Info($"资源包中检测到 MFAAvalonia 可执行文件: {newMFAExe}");
+        }
+
+        if (containsMFAExecutable
+            && !string.IsNullOrWhiteSpace(exeName)
+            && File.Exists(exeName)
+            && Path.GetDirectoryName(exeName)?.Equals(wpfDir, StringComparison.OrdinalIgnoreCase) == true
+            && !string.IsNullOrWhiteSpace(newMFAExeTargetPath)
+            && !Path.GetFullPath(exeName).Equals(Path.GetFullPath(newMFAExeTargetPath), StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                LoggerHelper.Info($"检测到主程序文件名变更，备份当前可执行文件: {exeName} -> {newMFAExeTargetPath}");
+                DeleteFileWithBackup(exeName);
+            }
+            catch (Exception ex)
+            {
+                LoggerHelper.Warning($"备份当前可执行文件失败: {exeName}, error: {ex.Message}");
+            }
+        }
 
         // 统一使用 CopyAndDelete 覆盖文件（旧文件被锁定时会自动备份为 .backupMFA）
         var di = new DirectoryInfo(originPath);
