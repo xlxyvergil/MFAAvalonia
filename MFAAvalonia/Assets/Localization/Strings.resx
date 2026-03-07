@@ -1917,6 +1917,15 @@
     <data name="SpecialTask_WaitForExit" xml:space="preserve">
         <value>等待程序退出</value>
     </data>
+    <data name="SpecialTask_KillSelfProcess" xml:space="preserve">
+        <value>结束自身进程</value>
+    </data>
+    <data name="SpecialTask_KillSelfProcessDesc" xml:space="preserve">
+        <value>开启时结束本程序自身进程；关闭后可输入其他进程名称来结束</value>
+    </data>
+    <data name="SpecialTask_ProcessSettings" xml:space="preserve">
+        <value>进程设置</value>
+    </data>
     <data name="SpecialTask_ProcessName" xml:space="preserve">
         <value>进程名称</value>
     </data>
@@ -1932,8 +1941,11 @@
     <data name="SpecialTask_SelectProgram" xml:space="preserve">
         <value>选择程序</value>
     </data>
+    <data name="SpecialTask_ProcessNamePlaceholder" xml:space="preserve">
+        <value>如 notepad.exe</value>
+    </data>
     <data name="SpecialTask_ProcessNameExample" xml:space="preserve">
-        <value>例如: notepad</value>
+        <value>如 notepad.exe</value>
     </data>
     <data name="SpecialTask_Shutdown" xml:space="preserve">
         <value>关机</value>
@@ -2023,6 +2035,9 @@
         <value>删除定时</value>
     </data>
 </root>
+
+
+
 
 
 

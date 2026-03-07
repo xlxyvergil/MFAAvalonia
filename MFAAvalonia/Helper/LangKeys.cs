@@ -629,7 +629,11 @@ public static class LangKeys
 	public static readonly string SpecialTask_ProgramPath = "SpecialTask_ProgramPath";
 	public static readonly string SpecialTask_Arguments = "SpecialTask_Arguments";
 	public static readonly string SpecialTask_WaitForExit = "SpecialTask_WaitForExit";
+	public static readonly string SpecialTask_KillSelfProcess = "SpecialTask_KillSelfProcess";
+	public static readonly string SpecialTask_KillSelfProcessDesc = "SpecialTask_KillSelfProcessDesc";
+	public static readonly string SpecialTask_ProcessSettings = "SpecialTask_ProcessSettings";
 	public static readonly string SpecialTask_ProcessName = "SpecialTask_ProcessName";
+	public static readonly string SpecialTask_ProcessNamePlaceholder = "SpecialTask_ProcessNamePlaceholder";
 	public static readonly string SpecialTask_OperationType = "SpecialTask_OperationType";
 	public static readonly string SpecialTask_RequestMethod = "SpecialTask_RequestMethod";
 	public static readonly string SpecialTask_RequestBody = "SpecialTask_RequestBody";
@@ -666,3 +670,5 @@ public static class LangKeys
 	public static readonly string TimerStopMFA = "TimerStopMFA";
 	
 }
+
+

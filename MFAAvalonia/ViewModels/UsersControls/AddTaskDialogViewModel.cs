@@ -119,7 +119,7 @@ public partial class AddTaskDialogViewModel : ViewModelBase
             "TimedWaitAction" => new JObject { ["hour"] = 0, ["minute"] = 0 },
             "SystemNotificationAction" => new JObject { ["title"] = "MFAAvalonia", ["message"] = "" },
             "CustomProgramAction" => new JObject { ["program"] = "", ["arguments"] = "", ["wait_for_exit"] = false },
-            "KillProcessAction" => new JObject { ["process_name"] = "" },
+            "KillProcessAction" => new JObject { ["kill_self_process"] = true, ["process_name"] = "" },
             "ComputerOperationAction" => new JObject { ["operation"] = "shutdown" },
             "WebhookAction" => new JObject { ["url"] = "", ["method"] = "GET", ["body"] = "", ["content_type"] = "application/json" },
             _ => new JObject()
@@ -181,3 +181,4 @@ public partial class AddTaskDialogViewModel : ViewModelBase
         Dialog.Dismiss();
     }
 }
+

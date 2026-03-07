@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
@@ -1617,37 +1617,98 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     }
 
     /// <summary>
-    /// 结束进程 - process_name (TextBox)
+    /// 结束进程 - kill_self_process (ToggleSwitch), process_name (TextBox)
     /// </summary>
     private void AddKillProcessOptions(StackPanel panel, DragItemViewModel dragItem)
     {
         var param = GetActionParam(dragItem);
+        var processName = (string?)param["process_name"] ?? string.Empty;
+        var killSelfProcess = (bool?)param["kill_self_process"] ?? string.IsNullOrWhiteSpace(processName);
+
+        var wrapper = new StackPanel();
         var grid = CreateSpecialTaskGrid(isFirstRow: true);
 
-        var label = CreateLabelPanel(LangKeys.SpecialTask_ProcessName, null, null, useI18n: true);
-        label.Margin = new Thickness(10, 0, 0, 0);
-        Grid.SetColumn(label, 0);
-        grid.Children.Add(label);
+        var labelPanel = CreateLabelPanel(LangKeys.SpecialTask_KillSelfProcess, null, LangKeys.SpecialTask_KillSelfProcessDesc, useI18n: true);
+        Grid.SetColumn(labelPanel, 0);
+        grid.Children.Add(labelPanel);
 
-        var textBox = new TextBox
+        var toggleSwitch = new ToggleSwitch
         {
-            Text = (string?)param["process_name"] ?? "",
-            MinWidth = 120,
-            Margin = new Thickness(0, 2, 0, 2),
+            IsChecked = killSelfProcess,
+            Classes = { "Switch" },
+            MaxHeight = 60,
+            MaxWidth = 100,
+            HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
-            Watermark = LangKeys.SpecialTask_ProcessNameExample.ToLocalization(),
         };
-        BindIdleEnabled(textBox);
-        textBox.TextChanged += (_, _) =>
+        BindIdleEnabled(toggleSwitch);
+        Grid.SetColumn(toggleSwitch, 2);
+        grid.Children.Add(toggleSwitch);
+        wrapper.Children.Add(grid);
+
+        var subOptionsContainer = new StackPanel();
+
+        void UpdateSubOptions(bool isKillSelf)
         {
-            param["process_name"] = textBox.Text ?? "";
+            subOptionsContainer.Children.Clear();
+            if (isKillSelf)
+                return;
+
+            var processGrid = CreateSpecialTaskGrid();
+            processGrid.Margin = new Thickness(0, 0, 0, 0);
+
+            var processLabel = CreateLabelPanel(LangKeys.SpecialTask_ProcessName, null, null, useI18n: true);
+            Grid.SetColumn(processLabel, 0);
+            processGrid.Children.Add(processLabel);
+
+            var textBox = new TextBox
+            {
+                Text = (string?)param["process_name"] ?? string.Empty,
+                MinWidth = 120,
+                Margin = new Thickness(0, 2, 0, 2),
+                VerticalAlignment = VerticalAlignment.Center,
+                Watermark = LangKeys.SpecialTask_ProcessNamePlaceholder.ToLocalization(),
+            };
+            BindIdleEnabled(textBox);
+            textBox.TextChanged += (_, _) =>
+            {
+                param["process_name"] = textBox.Text ?? string.Empty;
+                UpdateActionParam(dragItem, param);
+            };
+
+            Grid.SetColumn(textBox, 1);
+            AddResponsiveBehavior(processGrid, processLabel, textBox);
+            processGrid.Children.Add(textBox);
+            subOptionsContainer.Children.Add(processGrid);
+        }
+
+        toggleSwitch.IsCheckedChanged += (_, _) =>
+        {
+            var isKillSelf = toggleSwitch.IsChecked == true;
+            param["kill_self_process"] = isKillSelf;
             UpdateActionParam(dragItem, param);
+            UpdateSubOptions(isKillSelf);
         };
 
-        Grid.SetColumn(textBox, 1);
-        AddResponsiveBehavior(grid, label, textBox);
-        grid.Children.Add(textBox);
-        panel.Children.Add(grid);
+        UpdateSubOptions(killSelfProcess);
+
+        var subOptionsBorder = new Border
+        {
+            BorderThickness = new Thickness(2, 0, 0, 0),
+            Background = Brushes.Transparent,
+            Margin = new Thickness(24, 0, 0, 4),
+            Padding = new Thickness(8, 0, 0, 0),
+            Child = subOptionsContainer
+        };
+        subOptionsBorder.Bind(Border.BorderBrushProperty, new DynamicResourceExtension("SukiPrimaryColor"));
+        subOptionsBorder.Bind(Visual.IsVisibleProperty, new Binding("Children.Count")
+        {
+            Source = subOptionsContainer,
+            Converter = new FuncValueConverter<int, bool>(count => count > 0)
+        });
+
+        wrapper.Children.Add(subOptionsBorder);
+        panel.Children.Add(wrapper);
     }
 
     /// <summary>
@@ -1815,3 +1876,9 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
 
     #endregion
 }
+
+
+
+
+
+

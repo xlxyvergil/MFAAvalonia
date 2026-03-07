@@ -1907,6 +1907,15 @@
     <data name="SpecialTask_WaitForExit" xml:space="preserve">
         <value>Wait for Exit</value>
     </data>
+    <data name="SpecialTask_KillSelfProcess" xml:space="preserve">
+        <value>Kill Self Process</value>
+    </data>
+    <data name="SpecialTask_KillSelfProcessDesc" xml:space="preserve">
+        <value>When enabled, terminates this application itself; when disabled, you can enter another process name to terminate.</value>
+    </data>
+    <data name="SpecialTask_ProcessSettings" xml:space="preserve">
+        <value>Process Settings</value>
+    </data>
     <data name="SpecialTask_ProcessName" xml:space="preserve">
         <value>Process Name</value>
     </data>
@@ -1922,8 +1931,11 @@
     <data name="SpecialTask_SelectProgram" xml:space="preserve">
         <value>Select Program</value>
     </data>
+    <data name="SpecialTask_ProcessNamePlaceholder" xml:space="preserve">
+        <value>e.g. notepad.exe</value>
+    </data>
     <data name="SpecialTask_ProcessNameExample" xml:space="preserve">
-        <value>e.g.: notepad</value>
+        <value>e.g. notepad.exe</value>
     </data>
     <data name="SpecialTask_Shutdown" xml:space="preserve">
         <value>Shutdown</value>
@@ -2013,6 +2025,9 @@
         <value>Remove Timer</value>
     </data>
 </root>
+
+
+
 
 
 
