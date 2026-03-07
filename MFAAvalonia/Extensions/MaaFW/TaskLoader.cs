@@ -59,8 +59,15 @@ public class TaskLoader(MaaInterface? maaInterface, TaskQueueViewModel taskQueue
             drags = items.Select(interfaceItem => new DragItemViewModel(interfaceItem) { OwnerViewModel = taskQueueViewModel }).ToList();
         }
 
-        // 检测是否为全新实例（无任何已保存配置）
-        var isConfigEmpty = (oldDrags == null || oldDrags.Count == 0) && drags.Count == 0 && currentTasks.Count == 0;
+        // 检测是否为全新实例（既没有内存中的任务，也没有本地实例文件数据）
+        // 只在“真正首次初始化”的情况下才允许自动应用预设。
+        // 如果实例文件已存在但读取异常/字段缺失，宁可保持空，也不能误判成新实例然后套用预设，
+        // 否则用户会看到“标签是 id，点进去内容也完全不对”。
+        var hasExistingLocalConfig = instanceConfig.ConfigFileExists();
+        var isConfigEmpty = (oldDrags == null || oldDrags.Count == 0)
+            && drags.Count == 0
+            && currentTasks.Count == 0
+            && !hasExistingLocalConfig;
 
         if (firstTask)
         {

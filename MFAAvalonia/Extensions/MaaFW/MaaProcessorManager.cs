@@ -7,6 +7,8 @@ using MFAAvalonia.Configuration;
 using MFAAvalonia.Helper;
 using MFAAvalonia.Helper.Converters;
 using MFAAvalonia.ViewModels.Pages;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MFAAvalonia.Extensions.MaaFW;
 
@@ -212,6 +214,73 @@ public sealed class MaaProcessorManager
         while (usedNumbers.Contains(next))
             next++;
         return next;
+    }
+
+    private string CreateDefaultInstanceName()
+    {
+        return $"{LangKeys.Config.ToLocalization()} {GetNextInstanceNumber()}";
+    }
+
+    private static bool TryValidateInstanceFile(string instanceId, out string reason)
+    {
+        var filePath = Path.Combine(InstanceConfiguration.InstancesDir, $"{instanceId}.json");
+        reason = string.Empty;
+
+        try
+        {
+            if (!File.Exists(filePath))
+            {
+                reason = "实例文件不存在";
+                return false;
+            }
+
+            var json = File.ReadAllText(filePath);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                reason = "实例文件为空";
+                return false;
+            }
+
+            var token = JToken.Parse(json);
+            if (token is not JObject root)
+            {
+                reason = "实例文件根节点不是 JSON 对象";
+                return false;
+            }
+
+            if (root.TryGetValue(ConfigurationKeys.InstanceName, out var instanceNameToken)
+                && instanceNameToken.Type is not JTokenType.String and not JTokenType.Null)
+            {
+                reason = $"{ConfigurationKeys.InstanceName} 字段类型无效: {instanceNameToken.Type}";
+                return false;
+            }
+
+            if (root.TryGetValue(ConfigurationKeys.TaskItems, out var taskItemsToken)
+                && taskItemsToken.Type is not JTokenType.Array and not JTokenType.Null)
+            {
+                reason = $"{ConfigurationKeys.TaskItems} 字段类型无效: {taskItemsToken.Type}";
+                return false;
+            }
+
+            if (root.TryGetValue(ConfigurationKeys.CurrentTasks, out var currentTasksToken)
+                && currentTasksToken.Type is not JTokenType.Array and not JTokenType.Null)
+            {
+                reason = $"{ConfigurationKeys.CurrentTasks} 字段类型无效: {currentTasksToken.Type}";
+                return false;
+            }
+
+            return true;
+        }
+        catch (JsonException ex)
+        {
+            reason = $"JSON 解析失败: {ex.Message}";
+            return false;
+        }
+        catch (Exception ex)
+        {
+            reason = $"读取实例文件失败: {ex.Message}";
+            return false;
+        }
     }
 
     public MFAAvalonia.ViewModels.Pages.TaskQueueViewModel? GetViewModel(string instanceId)
@@ -679,15 +748,17 @@ public sealed class MaaProcessorManager
         LoggerHelper.Info($"[调试] instances 目录中实际存在的实例文件数量: {scannedIds.Count}, ID列表: [{string.Join(", ", scannedIds)}]");
 
         // 构造函数创建的 "default" 实例的 GetValue 回退迁移可能已写出 default.json，
-        // 先删除该文件，防止误识别为用户创建的实例
+        // 若已存在其他真实实例，则删除该临时文件，防止误识别为用户创建的实例
         var defaultFilePath = Path.Combine(InstanceConfiguration.InstancesDir, "default.json");
-        if (File.Exists(defaultFilePath) && !scannedIds.Contains("default"))
+        if (File.Exists(defaultFilePath)
+            && scannedIds.Contains("default")
+            && scannedIds.Any(id => !string.Equals(id, "default", StringComparison.OrdinalIgnoreCase)))
         {
-            LoggerHelper.Info($"[调试] 检测到未注册的 default.json，正在删除...");
+            LoggerHelper.Info("[调试] 检测到临时 default.json，正在删除...");
             try
             {
                 File.Delete(defaultFilePath);
-                scannedIds.Remove("default"); // 从扫描列表中移除
+                scannedIds.RemoveAll(id => string.Equals(id, "default", StringComparison.OrdinalIgnoreCase));
             }
             catch
             {
@@ -806,6 +877,14 @@ public sealed class MaaProcessorManager
                 MaaProcessor.ReadInterface();
             }
 
+            var validIds = new HashSet<string>(ids, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var staleId in _instanceNames.Keys.Where(id => !validIds.Contains(id)).ToList())
+                _instanceNames.Remove(staleId);
+
+            foreach (var staleId in _instancePresetIndexes.Keys.Where(id => !validIds.Contains(id)).ToList())
+                _instancePresetIndexes.Remove(staleId);
+
             // 1. 恢复顺序和名称（不创建实例）
             var orderStr = GlobalConfiguration.GetValue(ConfigurationKeys.InstanceOrder, "");
             _instanceOrder.Clear();
@@ -860,14 +939,32 @@ public sealed class MaaProcessorManager
                     }
                 }
                 else if (!_instanceNames.ContainsKey(id))
-                    _instanceNames[id] = id;
+                {
+                    name = CreateDefaultInstanceName();
+                    _instanceNames[id] = name;
+
+                    try
+                    {
+                        var instanceFilePath = Path.Combine(InstanceConfiguration.InstancesDir, $"{id}.json");
+                        var data = File.Exists(instanceFilePath)
+                            ? JsonHelper.LoadJson(instanceFilePath, new Dictionary<string, object>())
+                            : new Dictionary<string, object>();
+                        data[ConfigurationKeys.InstanceName] = name;
+                        JsonHelper.SaveJson(instanceFilePath, data,
+                            new MaaInterfaceSelectAdvancedConverter(false),
+                            new MaaInterfaceSelectOptionConverter(false));
+                    }
+                    catch
+                    {
+                        /* 名称回填失败不影响正常运行 */
+                    }
+                }
             }
 
             // 保存实例配置（同步实际文件到全局配置）
             SaveInstanceConfig();
 
             // 2. 清理不在配置中的实例（含磁盘文件，防止构造函数创建的临时实例残留）
-            var validIds = new HashSet<string>(ids);
             var toRemove = _instances.Keys.Where(k => !validIds.Contains(k)).ToList();
             foreach (var key in toRemove)
             {
@@ -922,7 +1019,14 @@ public sealed class MaaProcessorManager
             var id = Path.GetFileNameWithoutExtension(file);
             if (!string.IsNullOrWhiteSpace(id))
             {
-                instanceIds.Add(id);
+                if (TryValidateInstanceFile(id, out var reason))
+                {
+                    instanceIds.Add(id);
+                }
+                else
+                {
+                    LoggerHelper.Error($"[实例加载] 已排除异常实例文件: {file}，原因: {reason}");
+                }
             }
         }
         return instanceIds;
@@ -943,8 +1047,15 @@ public sealed class MaaProcessorManager
             var id = Path.GetFileNameWithoutExtension(file);
             if (!string.IsNullOrWhiteSpace(id) && !knownSet.Contains(id))
             {
-                extra.Add(id);
-                LoggerHelper.Info($"[扫描] 发现未注册的实例配置文件: {id}，将自动加载");
+                if (TryValidateInstanceFile(id, out var reason))
+                {
+                    extra.Add(id);
+                    LoggerHelper.Info($"[扫描] 发现未注册的实例配置文件: {id}，将自动加载");
+                }
+                else
+                {
+                    LoggerHelper.Error($"[实例加载] 已排除异常实例文件: {file}，原因: {reason}");
+                }
             }
         }
         return extra;
