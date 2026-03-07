@@ -780,7 +780,23 @@ public sealed class MaaProcessorManager
             }
 
             // 如果没有 preset，继续使用 default 实例（不保存配置，避免将临时 default 实例写入磁盘）
-            LoggerHelper.Info("没有 preset，将继续使用默认的 default 实例但不保存到配置");
+            // 但仍需完成首次实例初始化，否则首启时 ViewModel/任务数据会处于未就绪状态，表现为第一次异常、第二次正常。
+            LoggerHelper.Info("没有 preset，将继续使用默认的 default 实例并完成首次初始化，但不保存到配置");
+
+            lock (_lock)
+            {
+                if (!_instanceOrder.Contains("default"))
+                    _instanceOrder.Add("default");
+
+                if (!_instanceNames.ContainsKey("default"))
+                    _instanceNames["default"] = $"{LangKeys.Config.ToLocalization()} 1";
+
+                LoadSingleInstance("default");
+                Current = _instances["default"];
+                _pendingInstanceIds.Clear();
+                _isLazyLoadingComplete = true;
+            }
+
             return;
         }
         lock (_lock)
