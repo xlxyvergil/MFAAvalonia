@@ -212,6 +212,8 @@ public partial class App : Application
     {
         TrayIconManager.DisposeTrayIcon(this);
 
+        MaaProcessorManager.Instance.PersistCurrentSelection();
+
         foreach (var p in MaaProcessor.Processors)
         {
             if (p.ViewModel != null)

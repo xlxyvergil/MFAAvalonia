@@ -116,8 +116,6 @@ public sealed class MaaProcessorManager
 
     public bool SwitchCurrent(string instanceId)
     {
-        string? list, order, lastActive;
-
         lock (_lock)
         {
             if (!_instances.TryGetValue(instanceId, out var processor))
@@ -125,20 +123,18 @@ public sealed class MaaProcessorManager
 
             Current = processor;
 
-            // 在锁内捕获数据快照，锁外异步写入，避免阻塞 UI 线程
-            list = string.Join(",", _instanceOrder);
-            order = string.Join(",", _instanceOrder);
-            lastActive = Current.InstanceId;
+            SaveInstanceConfig();
         }
 
-        Task.Run(() =>
-        {
-            GlobalConfiguration.SetValue(ConfigurationKeys.InstanceList, list);
-            GlobalConfiguration.SetValue(ConfigurationKeys.InstanceOrder, order);
-            GlobalConfiguration.SetValue(ConfigurationKeys.LastActiveInstance, lastActive);
-        });
-
         return true;
+    }
+
+    public void PersistCurrentSelection()
+    {
+        lock (_lock)
+        {
+            SaveInstanceConfig();
+        }
     }
 
     private MaaProcessor CreateInstanceInternal(string instanceId, bool setCurrent)
@@ -361,7 +357,7 @@ public sealed class MaaProcessorManager
         return false;
     }
 
-    private void SaveInstanceConfig()
+    private void SaveInstanceConfig(bool saveLastActive = true)
     {
         // 使用 _instanceOrder 作为实例列表源，因为迁移阶段实例已注册到 _instanceOrder 但尚未创建到 _instances
         var list = string.Join(",", _instanceOrder);
@@ -369,7 +365,16 @@ public sealed class MaaProcessorManager
 
         GlobalConfiguration.SetValue(ConfigurationKeys.InstanceList, list);
         GlobalConfiguration.SetValue(ConfigurationKeys.InstanceOrder, order);
+
+        if (!saveLastActive || Current == null)
+            return;
+
+        var lastActiveName = _instanceNames.TryGetValue(Current.InstanceId, out var name)
+            ? name
+            : Current.InstanceId;
+
         GlobalConfiguration.SetValue(ConfigurationKeys.LastActiveInstance, Current.InstanceId);
+        GlobalConfiguration.SetValue(ConfigurationKeys.LastActiveInstanceName, lastActiveName);
     }
 
     /// <summary>
@@ -816,15 +821,13 @@ public sealed class MaaProcessorManager
                     }
 
 
-                    // 保存实例列表到全局配置
-                    SaveInstanceConfig();
-
                     // 加载第一个实例作为当前活跃实例
                     if (_instanceOrder.Count > 0)
                     {
                         var firstId = _instanceOrder[0];
                         LoadSingleInstance(firstId);
                         Current = _instances[firstId];
+                        SaveInstanceConfig();
 
                         // 应用对应的 preset 到该实例
                         var firstPreset = presets[0];
@@ -961,8 +964,8 @@ public sealed class MaaProcessorManager
                 }
             }
 
-            // 保存实例配置（同步实际文件到全局配置）
-            SaveInstanceConfig();
+            // 先仅同步实例列表/顺序，避免在读取上次活跃实例前把其覆盖掉
+            SaveInstanceConfig(false);
 
             // 2. 清理不在配置中的实例（含磁盘文件，防止构造函数创建的临时实例残留）
             var toRemove = _instances.Keys.Where(k => !validIds.Contains(k)).ToList();
@@ -979,7 +982,22 @@ public sealed class MaaProcessorManager
 
             // 3. 优先加载 ActiveTab 实例
             var lastActive = GlobalConfiguration.GetValue(ConfigurationKeys.LastActiveInstance, "");
-            if (string.IsNullOrEmpty(lastActive) || !validIds.Contains(lastActive))
+            if (string.IsNullOrWhiteSpace(lastActive) || !validIds.Contains(lastActive))
+            {
+                var lastActiveName = GlobalConfiguration.GetValue(ConfigurationKeys.LastActiveInstanceName, "");
+                if (!string.IsNullOrWhiteSpace(lastActiveName))
+                {
+                    var matchedIdByName = _instanceOrder.FirstOrDefault(id =>
+                        validIds.Contains(id)
+                        && _instanceNames.TryGetValue(id, out var instanceName)
+                        && instanceName.Equals(lastActiveName, StringComparison.OrdinalIgnoreCase));
+
+                    if (!string.IsNullOrWhiteSpace(matchedIdByName))
+                        lastActive = matchedIdByName;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(lastActive) || !validIds.Contains(lastActive))
                 lastActive = _instanceOrder.FirstOrDefault() ?? ids[0];
 
             // 支持 -c 参数按实例名称激活多开实例
@@ -993,6 +1011,7 @@ public sealed class MaaProcessorManager
 
             LoadSingleInstance(lastActive);
             Current = _instances[lastActive];
+            SaveInstanceConfig();
 
             // 4. 收集剩余待加载的实例ID
             _pendingInstanceIds.Clear();

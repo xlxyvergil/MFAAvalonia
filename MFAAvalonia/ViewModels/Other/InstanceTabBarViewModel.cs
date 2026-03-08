@@ -279,17 +279,31 @@ public partial class InstanceTabBarViewModel : ViewModelBase
             _isReloading = false;
         }
 
+        EnsureValidActiveTab();
+    }
+
+    private void EnsureValidActiveTab()
+    {
+        if (Tabs.Count == 0)
+        {
+            ActiveTab = null;
+            return;
+        }
+
         var current = MaaProcessorManager.Instance.Current;
-        if (current != null)
+        var preferredTab = current == null
+            ? null
+            : Tabs.FirstOrDefault(t => t.InstanceId == current.InstanceId);
+
+        if (preferredTab != null)
         {
-            var tab = Tabs.FirstOrDefault(t => t.InstanceId == current.InstanceId);
-            if (tab != null && ActiveTab != tab)
-                ActiveTab = tab;
+            if (!ReferenceEquals(ActiveTab, preferredTab))
+                ActiveTab = preferredTab;
+            return;
         }
-        else if (Tabs.Count > 0 && ActiveTab == null)
-        {
+
+        if (ActiveTab == null || !Tabs.Contains(ActiveTab))
             ActiveTab = Tabs.First();
-        }
     }
 
     /// <summary>
@@ -546,10 +560,7 @@ public partial class InstanceTabBarViewModel : ViewModelBase
             Tabs.Remove(tab);
             RefreshFilteredTabs();
             RefreshFilteredRecentClosedTabs();
-            if (ActiveTab == tab || ActiveTab == null)
-            {
-                ActiveTab = Tabs.FirstOrDefault();
-            }
+            EnsureValidActiveTab();
         }
     }
 

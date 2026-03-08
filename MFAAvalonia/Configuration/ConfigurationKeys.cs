@@ -245,6 +245,9 @@ public static class ConfigurationKeys
     /// <summary>最后激活的实例ID</summary>
     public const string LastActiveInstance = "Instances.LastActive";
 
+    /// <summary>最后激活的实例名称（当实例ID失效时用于回退匹配）</summary>
+    public const string LastActiveInstanceName = "Instances.LastActiveName";
+
     /// <summary>实例名称（存储在各实例独立 JSON 中）</summary>
     public const string InstanceName = "InstanceName";
 
