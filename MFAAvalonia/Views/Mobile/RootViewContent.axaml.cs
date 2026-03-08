@@ -85,13 +85,11 @@ public partial class RootViewContent : UserControl
 
     private void ThemeModeToggle_OnChecked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        Instances.GuiSettingsUserControlModel.BaseTheme = ThemeVariant.Dark;
         UpdateThemeToggleIcon();
     }
 
     private void ThemeModeToggle_OnUnchecked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        Instances.GuiSettingsUserControlModel.BaseTheme = ThemeVariant.Light;
         UpdateThemeToggleIcon();
     }
 

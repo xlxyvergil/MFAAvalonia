@@ -86,7 +86,7 @@
                                       Classes="Basic"
                                       Checked="ThemeModeToggle_OnChecked"
                                       Unchecked="ThemeModeToggle_OnUnchecked"
-                                      IsChecked="{Binding BaseTheme, Source={x:Static helper:Instances.GuiSettingsUserControlModel}, Converter={converters:UniversalEqualityConverter}, ConverterParameter={x:Static styling:ThemeVariant.Dark}, Mode=OneWay}">
+                                      IsChecked="{Binding BaseTheme, Source={x:Static helper:Instances.GuiSettingsUserControlModel}, Converter={converters:UniversalEqualityConverter}, ConverterParameter={x:Static styling:ThemeVariant.Dark}, Mode=TwoWay}">
                             <fluentIcon:FluentIcon x:Name="ThemeModeIcon"
                                                    Icon="WeatherMoon"
                                                    IconVariant="Regular"

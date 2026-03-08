@@ -87,8 +87,7 @@ public static class JsonHelper
     // 辅助方法：获取配置文件路径
     private static string GetConfigPath(string configName)
     {
-        var exeDir = Path.GetDirectoryName(AppContext.BaseDirectory);
-        var configDir = Path.Combine(exeDir, "config");
+        var configDir = Path.Combine(AppContext.BaseDirectory, "config");
         if (!Directory.Exists(configDir))
         {
             Directory.CreateDirectory(configDir);
