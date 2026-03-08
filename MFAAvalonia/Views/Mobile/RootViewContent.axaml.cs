@@ -6,8 +6,6 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using FluentIcons.Avalonia.Fluent;
-using FluentIcons.Common;
 using MFAAvalonia.Configuration;
 using MFAAvalonia.Helper;
 using MFAAvalonia.Views.UserControls;
@@ -22,19 +20,15 @@ namespace MFAAvalonia.Views.Mobile;
 
 public partial class RootViewContent : UserControl
 {
-    private FluentIcon? _themeModeIcon;
-
     public RootViewContent()
     {
         InitializeComponent();
-        _themeModeIcon = this.FindControl<FluentIcon>("ThemeModeIcon");
         Loaded += OnLoaded;
     }
 
     private void OnLoaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
-        UpdateThemeToggleIcon();
 
         if (!AppRuntime.IsNewInstance) return;
 
@@ -83,24 +77,14 @@ public partial class RootViewContent : UserControl
             sideMenu.SelectedItem = homeItem;
     }
 
-    private void ThemeModeToggle_OnChecked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void SwitchToDarkTheme(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        UpdateThemeToggleIcon();
+        Instances.GuiSettingsUserControlModel.BaseTheme = ThemeVariant.Dark;
     }
 
-    private void ThemeModeToggle_OnUnchecked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void SwitchToLightTheme(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        UpdateThemeToggleIcon();
-    }
-
-    private void UpdateThemeToggleIcon()
-    {
-        _themeModeIcon ??= this.FindControl<FluentIcon>("ThemeModeIcon");
-        if (_themeModeIcon == null) return;
-
-        _themeModeIcon.Icon = Instances.GuiSettingsUserControlModel.BaseTheme == ThemeVariant.Dark
-            ? Icon.WeatherSunny
-            : Icon.WeatherMoon;
+        Instances.GuiSettingsUserControlModel.BaseTheme = ThemeVariant.Light;
     }
 
     #endregion

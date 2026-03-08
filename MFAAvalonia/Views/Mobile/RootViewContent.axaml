@@ -75,30 +75,51 @@
                     </suki:SukiSideMenu.HeaderContent>
 
                     <suki:SukiSideMenu.FooterActionsContent>
-                        <ToggleButton x:Name="ThemeModeToggle"
-                                      Margin="3,2,3,6"
-                                      Width="40"
-                                      Height="40"
-                                      HorizontalAlignment="Left"
-                                      HorizontalContentAlignment="Center"
-                                      VerticalContentAlignment="Center"
-                                      Padding="0"
-                                      Classes="Basic"
-                                      Checked="ThemeModeToggle_OnChecked"
-                                      Unchecked="ThemeModeToggle_OnUnchecked"
-                                      IsChecked="{Binding BaseTheme, Source={x:Static helper:Instances.GuiSettingsUserControlModel}, Converter={converters:UniversalEqualityConverter}, ConverterParameter={x:Static styling:ThemeVariant.Dark}, Mode=TwoWay}">
-                            <fluentIcon:FluentIcon x:Name="ThemeModeIcon"
-                                                   Icon="WeatherMoon"
-                                                   IconVariant="Regular"
-                                                   IconSize="Size20"
-                                                   Foreground="{DynamicResource SukiText}">
-                                <fluentIcon:FluentIcon.Transitions>
-                                    <Transitions>
-                                        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" />
-                                    </Transitions>
-                                </fluentIcon:FluentIcon.Transitions>
-                            </fluentIcon:FluentIcon>
-                        </ToggleButton>
+                        <Grid>
+                            <Button Margin="3,2,3,6"
+                                    Width="40"
+                                    Height="40"
+                                    HorizontalAlignment="Left"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Padding="0"
+                                    Classes="Basic"
+                                    Click="SwitchToDarkTheme"
+                                    IsVisible="{Binding BaseTheme, Source={x:Static helper:Instances.GuiSettingsUserControlModel}, Converter={converters:UniversalEqualityConverter}, ConverterParameter={x:Static styling:ThemeVariant.Light}, Mode=OneWay}">
+                                <fluentIcon:FluentIcon Icon="WeatherMoon"
+                                                       IconVariant="Regular"
+                                                       IconSize="Size20"
+                                                       Foreground="{DynamicResource SukiText}">
+                                    <fluentIcon:FluentIcon.Transitions>
+                                        <Transitions>
+                                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" />
+                                        </Transitions>
+                                    </fluentIcon:FluentIcon.Transitions>
+                                </fluentIcon:FluentIcon>
+                            </Button>
+
+                            <Button Margin="3,2,3,6"
+                                    Width="40"
+                                    Height="40"
+                                    HorizontalAlignment="Left"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Padding="0"
+                                    Classes="Basic"
+                                    Click="SwitchToLightTheme"
+                                    IsVisible="{Binding BaseTheme, Source={x:Static helper:Instances.GuiSettingsUserControlModel}, Converter={converters:UniversalEqualityConverter}, ConverterParameter={x:Static styling:ThemeVariant.Dark}, Mode=OneWay}">
+                                <fluentIcon:FluentIcon Icon="WeatherSunny"
+                                                       IconVariant="Regular"
+                                                       IconSize="Size20"
+                                                       Foreground="{DynamicResource SukiText}">
+                                    <fluentIcon:FluentIcon.Transitions>
+                                        <Transitions>
+                                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" />
+                                        </Transitions>
+                                    </fluentIcon:FluentIcon.Transitions>
+                                </fluentIcon:FluentIcon>
+                            </Button>
+                        </Grid>
                     </suki:SukiSideMenu.FooterActionsContent>
 
                     <suki:SukiSideMenu.FooterMenuItems>
