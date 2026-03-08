@@ -853,9 +853,10 @@ public sealed class MaaProcessorManager
                 }
             }
 
-            // 如果没有 preset，继续使用 default 实例（不保存配置，避免将临时 default 实例写入磁盘）
-            // 但仍需完成首次实例初始化，否则首启时 ViewModel/任务数据会处于未就绪状态，表现为第一次异常、第二次正常。
-            LoggerHelper.Info("没有 preset，将继续使用默认的 default 实例并完成首次初始化，但不保存到配置");
+            // 如果没有 preset，继续使用 default 实例，并将其作为真正的初始实例持久化。
+            // 否则本次启动虽然看起来已有“默认配置”，但重启后因为磁盘上仍无实例文件，
+            // 一旦 interface 后续新增 preset，就会被误判为“首次初始化”，从而被 preset 替换。
+            LoggerHelper.Info("没有 preset，将继续使用默认的 default 实例并持久化到配置");
 
             lock (_lock)
             {
@@ -867,6 +868,8 @@ public sealed class MaaProcessorManager
 
                 LoadSingleInstance("default");
                 Current = _instances["default"];
+                Current.InstanceConfiguration.SetValue(ConfigurationKeys.InstanceName, _instanceNames["default"]);
+                SaveInstanceConfig();
                 _pendingInstanceIds.Clear();
                 _isLazyLoadingComplete = true;
             }

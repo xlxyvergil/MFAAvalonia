@@ -318,6 +318,21 @@ public partial class InstanceTabBarViewModel : ViewModelBase
     partial void OnActiveTabChanged(InstanceTabViewModel? oldValue, InstanceTabViewModel? newValue)
     {
         if (oldValue != null) oldValue.IsActive = false;
+
+        if (newValue == null)
+        {
+            if (!_isReloading && Tabs.Count > 0)
+            {
+                DispatcherHelper.PostOnMainThread(() =>
+                {
+                    if (ActiveTab == null && Tabs.Count > 0)
+                        EnsureValidActiveTab();
+                });
+            }
+
+            return;
+        }
+
         if (newValue != null)
         {
             newValue.IsActive = true;
