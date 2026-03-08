@@ -1057,7 +1057,7 @@
         <value>自定义配置选择</value>
     </data>
     <data name="TimerCustomConfigTip" xml:space="preserve">
-        <value>将提前5秒切换到所选配置并执行任务</value>
+        <value>开启后，定时任务将按各自选择的配置执行，而不是使用当前激活的配置</value>
     </data>
     <data name="Tip" xml:space="preserve">
         <value>提示</value>
