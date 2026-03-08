@@ -832,7 +832,7 @@ public class MaaProcessor
     private int _isConnecting;
     public bool IsConnecting => _isConnecting != 0;
 
-    private IMaaController? GetScreenshotController(bool test)
+    private MaaController? GetScreenshotController(bool test)
     {
         if (test && !_isClosed)
             TryConnectAsync(CancellationToken.None);
@@ -875,8 +875,18 @@ public class MaaProcessor
     {
         var controller = GetScreenshotController(false);
 
-        if (controller == null || !controller.IsConnected)
+        if (controller == null)
             return MaaJobStatus.Invalid;
+
+        if (!controller.IsConnected)
+        {
+            if (IsAnyScreenshotRelatedWorkRunning(controller))
+            {
+                return MaaJobStatus.Succeeded;
+            }
+
+            return MaaJobStatus.Invalid;
+        }
 
         try
         {
@@ -886,6 +896,27 @@ public class MaaProcessor
         {
             LoggerHelper.Warning($"PostScreencap failed: {ex.Message}");
             return MaaJobStatus.Invalid;
+        }
+    }
+
+    private bool IsAnyScreenshotRelatedWorkRunning(MaaController? controller)
+    {
+        return controller?.IsConnected == true || _screenshotTasker?.IsRunning == true || MaaTasker?.IsRunning == true;
+    }
+
+    private static bool IsControllerRunning(IMaaController? controller)
+    {
+        if (controller == null)
+            return false;
+
+        try
+        {
+            var property = controller.GetType().GetProperty("IsRunning");
+            return property?.PropertyType == typeof(bool) && property.GetValue(controller) is true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
