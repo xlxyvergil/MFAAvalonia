@@ -1048,7 +1048,7 @@
         <value>Custom config</value>
     </data>
     <data name="TimerCustomConfigTip" xml:space="preserve">
-        <value>Restart and switch configuration two minutes in advance</value>
+        <value>Switch to the selected config 5 seconds in advance and execute the task</value>
     </data>
     <data name="Tip" xml:space="preserve">
         <value>Tip</value>

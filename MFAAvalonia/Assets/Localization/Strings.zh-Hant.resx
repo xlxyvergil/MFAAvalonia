@@ -1048,7 +1048,7 @@
         <value>自定義配置選擇</value>
     </data>
     <data name="TimerCustomConfigTip" xml:space="preserve">
-        <value>將提前兩分鐘重開並切換配置</value>
+        <value>將提前 5 秒切換到所選配置並執行任務</value>
     </data>
     <data name="Tip" xml:space="preserve">
         <value>提示</value>
