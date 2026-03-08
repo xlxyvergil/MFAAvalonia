@@ -287,7 +287,7 @@
                                         CornerRadius="{DynamicResource SmallCornerRadius}"
                                         IsAnimated="False" />
                         <!-- 跟随最右侧配置 -->
-                        <Button Grid.Row="0"
+                        <Button Grid.Row="0" Margin="5"
                                 Classes="PresetFollowItem"
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Stretch"
@@ -310,7 +310,7 @@
                         <Border Grid.Row="1" Background="{DynamicResource SukiControlBorderBrush}" Height="1" Margin="8,0,8,6" />
                         <!-- 预设列表 -->
                         <ScrollViewer x:Name="PresetMenuScrollViewer"
-                                      Grid.Row="2"
+                                      Grid.Row="2"  Margin="0,0,5,0"
                                       MaxHeight="320"
                                       HorizontalScrollBarVisibility="Disabled"
                                       VerticalScrollBarVisibility="Auto">
@@ -368,7 +368,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </ScrollViewer>
-                        <TextBox Grid.Row="3" Margin="8,10,4,8"
+                        <TextBox Grid.Row="3" Margin="8,2,4,8"
                                  Text="{Binding PresetSearchText, Mode=TwoWay}"
                                  Watermark="{markup:I18n {x:Static helper:LangKeys.Search}}">
                             <TextBox.InnerRightContent>
