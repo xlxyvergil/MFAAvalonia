@@ -36,6 +36,7 @@ public class InstanceTabsControl : TabControl
     private Border? _clipBoundsSource;
     private bool _suspendComplexTabClips;
     private int _lastClipLayoutStamp = int.MinValue;
+    private bool _clipRetryScheduled;
 
     public static readonly DirectProperty<InstanceTabsControl, int> OverflowCountProperty =
         AvaloniaProperty.RegisterDirect<InstanceTabsControl, int>(
@@ -167,6 +168,20 @@ public class InstanceTabsControl : TabControl
     {
         _clipDirty = true;
         Dispatcher.UIThread.Post(ApplyClipIfDirty, DispatcherPriority.Render);
+    }
+
+    private void ScheduleClipRetry()
+    {
+        if (_clipRetryScheduled)
+            return;
+
+        _clipRetryScheduled = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _clipRetryScheduled = false;
+            _lastClipLayoutStamp = int.MinValue;
+            InvalidateClip();
+        }, DispatcherPriority.Loaded);
     }
 
     private void ApplyClipIfDirty()
@@ -406,6 +421,8 @@ public class InstanceTabsControl : TabControl
         if (selectedTab == null)
         {
             _tabBarBackground.Clip = null;
+            if (SelectedItem != null)
+                ScheduleClipRetry();
             return;
         }
 
@@ -413,8 +430,12 @@ public class InstanceTabsControl : TabControl
         if (selectedShape == null)
         {
             _tabBarBackground.Clip = null;
+            if (SelectedItem != null)
+                ScheduleClipRetry();
             return;
         }
+
+        _clipRetryScheduled = false;
 
         var fullRect = new RectangleGeometry(new Rect(0, 0, totalBounds.Width, totalBounds.Height));
         Geometry clipGeo = new CombinedGeometry(GeometryCombineMode.Exclude, fullRect, selectedShape);
@@ -462,6 +483,8 @@ public class InstanceTabsControl : TabControl
         if (selectedTab != null && (selectedTab.Bounds.Width <= 0 || selectedTab.Bounds.Height <= 0))
         {
             ClearAllTabClips();
+            if (SelectedItem != null)
+                ScheduleClipRetry();
             return;
         }
 
