@@ -494,6 +494,7 @@ public sealed class MaaProcessorManager
     {
         var config = ConfigurationManager.Current.Config;
         var prefix = "Instance.";
+        var referencedInstanceIds = GetReferencedLegacyInstanceIds();
 
         // 收集所有 Instance.{id}.{key} 格式的键
         var instanceData = new Dictionary<string, Dictionary<string, object>>();
@@ -533,7 +534,16 @@ public sealed class MaaProcessorManager
 
         foreach (var (instanceId, data) in instanceData)
         {
+            var hasRealInstanceScopedData = data.Keys.Any(key => !string.Equals(key, ConfigurationKeys.InstanceName, StringComparison.Ordinal));
             var instanceFilePath = Path.Combine(instancesDir, $"{instanceId}.json");
+
+            if (!hasRealInstanceScopedData
+                && !File.Exists(instanceFilePath)
+                && !referencedInstanceIds.Contains(instanceId))
+            {
+                LoggerHelper.Info($"[迁移] 跳过孤立实例名称键: {instanceId}（仅存在旧版 Name 键，且未被实例列表引用）");
+                continue;
+            }
 
             // 如果实例文件已存在，合并（不覆盖已有的）
             var existingData = new Dictionary<string, object>();
@@ -571,6 +581,33 @@ public sealed class MaaProcessorManager
             new MaaInterfaceSelectOptionConverter(false));
 
         LoggerHelper.Info("[迁移] 已从 config.json 中清理 scoped keys");
+    }
+
+    private static HashSet<string> GetReferencedLegacyInstanceIds()
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void AddCsv(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return;
+
+            foreach (var item in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!string.IsNullOrWhiteSpace(item))
+                    ids.Add(item);
+            }
+        }
+
+        AddCsv(GlobalConfiguration.GetValue(ConfigurationKeys.InstanceList, string.Empty));
+        AddCsv(GlobalConfiguration.GetValue(ConfigurationKeys.InstanceOrder, string.Empty));
+
+        var lastActive = GlobalConfiguration.GetValue(ConfigurationKeys.LastActiveInstance, string.Empty);
+        if (!string.IsNullOrWhiteSpace(lastActive))
+            ids.Add(lastActive);
+
+        ids.Add("default");
+        return ids;
     }
 
     /// <summary>
