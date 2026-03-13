@@ -373,7 +373,10 @@ public static class LangKeys
 	public static readonly string UpdateSettings = "UpdateSettings";
 	public static readonly string UseGpuForInference = "UseGpuForInference";
 	public static readonly string WaitSoftware = "WaitSoftware";
+	public static readonly string WaitSoftwareDescription = "WaitSoftwareDescription";
 	public static readonly string WaitSoftwareTime = "WaitSoftwareTime";
+	public static readonly string StartupConnectRetrying = "StartupConnectRetrying";
+	public static readonly string StartupConnectSucceededDelay = "StartupConnectSucceededDelay";
 	public static readonly string Warning_CannotConnect = "Warning_CannotConnect";
 	public static readonly string Window = "Window";
 	public static readonly string WindowDetectionStarted = "WindowDetectionStarted";

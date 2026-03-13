@@ -138,6 +138,10 @@
                             Text="{markup:I18n {x:Static helper:LangKeys.WaitSoftware}}" />
                     </StackPanel>
                 </DockPanel>
+                <TextBlock
+                    Opacity="0.72"
+                    TextWrapping="Wrap"
+                    Text="{markup:I18n {x:Static helper:LangKeys.WaitSoftwareDescription}}" />
             </StackPanel>
         </suki:GlassCard>
         <suki:GlassCard Padding="25">

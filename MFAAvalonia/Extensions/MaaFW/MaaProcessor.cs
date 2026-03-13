@@ -3603,7 +3603,10 @@ public class MaaProcessor
             await StartSoftware();
         }
 
-        ViewModel?.TryReadAdbDeviceFromConfig(false);
+        if (ViewModel?.IsConnected != true)
+        {
+            ViewModel?.TryReadAdbDeviceFromConfig(false);
+        }
     }
     private CancellationTokenSource? _emulatorCancellationTokenSource;
     private static Process? _softwareProcess;
@@ -3699,36 +3702,67 @@ public class MaaProcessor
                 _softwareProcess = Process.Start(startInfo);
         }
 
-        for (double remainingTime = waitTimeInSeconds + 1; remainingTime > 0; remainingTime -= 1)
+        await WaitForStartupConnectionWindowAsync(waitTimeInSeconds, token);
+    }
+
+    private async Task WaitForStartupConnectionWindowAsync(double waitTimeInSeconds, CancellationToken token)
+    {
+        var connectionWindow = TimeSpan.FromSeconds(Math.Max(0, waitTimeInSeconds));
+        if (connectionWindow <= TimeSpan.Zero)
+            return;
+
+        var targetKey = (ViewModel?.CurrentController ?? MaaControllerTypes.Adb) switch
         {
-            if (token.IsCancellationRequested)
+            MaaControllerTypes.Adb => LangKeys.Emulator,
+            MaaControllerTypes.Win32 => LangKeys.Window,
+            MaaControllerTypes.PlayCover => LangKeys.TabPlayCover,
+            _ => LangKeys.Window
+        };
+        var deadline = DateTime.UtcNow + connectionWindow;
+        var attempt = 0;
+
+        AddLogByKey(LangKeys.WaitSoftwareTime, (IBrush?)null, true, true, targetKey, Math.Ceiling(connectionWindow.TotalSeconds).ToString("0"));
+
+        while (DateTime.UtcNow <= deadline)
+        {
+            token.ThrowIfCancellationRequested();
+            attempt++;
+
+            if (ViewModel?.CurrentController != MaaControllerTypes.PlayCover)
             {
+                ViewModel?.TryReadAdbDeviceFromConfig(false, true);
+            }
+
+            var tuple = await TryConnectAsync(token);
+            if (tuple.Item1)
+            {
+                ViewModel?.SetConnected(true);
+                AddLogByKey(LangKeys.StartupConnectSucceededDelay, (IBrush?)null, true, true, targetKey);
+                LoggerHelper.Info($"Startup connection succeeded on attempt {attempt}, waiting 5 seconds before continuing.");
+                await Task.Delay(TimeSpan.FromSeconds(5), token);
                 return;
             }
 
-            if (remainingTime % 10 == 0)
+            if (!tuple.Item3)
             {
-                AddLogByKey(LangKeys.WaitSoftwareTime, (IBrush?)null, true, true,
-                    ((ViewModel?.CurrentController ?? MaaControllerTypes.Adb) == MaaControllerTypes.Adb)
-                        ? LangKeys.Emulator
-                        : LangKeys.Window,
-                    remainingTime.ToString()
-                );
-            }
-            else if (remainingTime.Equals(waitTimeInSeconds))
-            {
-                AddLogByKey(LangKeys.WaitSoftwareTime, (IBrush?)null, true, true,
-                    ((ViewModel?.CurrentController ?? MaaControllerTypes.Adb) == MaaControllerTypes.Adb)
-                        ? LangKeys.Emulator
-                        : LangKeys.Window,
-                    remainingTime.ToString()
-                );
+                LoggerHelper.Warning($"Startup connection stopped retrying after attempt {attempt} because the connection is not retryable.");
+                return;
             }
 
+            var remainingSeconds = Math.Max(0, (int)Math.Ceiling((deadline - DateTime.UtcNow).TotalSeconds));
+            if (attempt == 1 || remainingSeconds <= 3 || remainingSeconds % 5 == 0)
+            {
+                AddLogByKey(LangKeys.StartupConnectRetrying, (IBrush?)null, true, true, targetKey, remainingSeconds.ToString());
+            }
+            LoggerHelper.Info($"Startup connection attempt {attempt} failed, remaining retry window: {remainingSeconds}s.");
+
+            if (DateTime.UtcNow >= deadline)
+                break;
 
             await Task.Delay(1000, token);
         }
-
+        
+        LoggerHelper.Warning($"Startup connection window expired after {Math.Max(0, waitTimeInSeconds):0.#} seconds.");
     }
 
     [SupportedOSPlatform("windows")]

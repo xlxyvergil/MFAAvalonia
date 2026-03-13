@@ -1102,10 +1102,19 @@
         <value>使用 GPU 加速推理</value>
     </data>
     <data name="WaitSoftware" xml:space="preserve">
-        <value>等待游戏启动时间(秒)</value>
+        <value>启动后连接尝试时长(秒)</value>
+    </data>
+    <data name="WaitSoftwareDescription" xml:space="preserve">
+        <value>启动软件后，会在该时长内持续尝试连接；连接成功后再等待 5 秒并自动开始任务。</value>
     </data>
     <data name="WaitSoftwareTime" xml:space="preserve">
-        <value>等待{0}启动时间(秒): {1}(s)</value>
+        <value>启动{0}后将在 {1} 秒内持续尝试连接</value>
+    </data>
+    <data name="StartupConnectRetrying" xml:space="preserve">
+        <value>正在尝试连接{0}，剩余 {1} 秒</value>
+    </data>
+    <data name="StartupConnectSucceededDelay" xml:space="preserve">
+        <value>已连接到{0}，5 秒后开始任务</value>
     </data>
     <data name="Warning_CannotConnect" xml:space="preserve">
         <value>无法连接至{0}</value>

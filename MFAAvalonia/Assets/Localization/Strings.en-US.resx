@@ -1093,10 +1093,19 @@
         <value>Use GPU for inference acceleration</value>
     </data>
     <data name="WaitSoftware" xml:space="preserve">
-        <value>Wait time for game to start (seconds)</value>
+        <value>Connection retry window after launch (seconds)</value>
+    </data>
+    <data name="WaitSoftwareDescription" xml:space="preserve">
+        <value>After launching the software, MFA will keep trying to connect within this time. Once connected, it waits 5 more seconds and starts the task automatically.</value>
     </data>
     <data name="WaitSoftwareTime" xml:space="preserve">
-        <value>Wait time for {0} to start (seconds): {1}(s)</value>
+        <value>After launching {0}, MFA will keep trying to connect for {1} seconds</value>
+    </data>
+    <data name="StartupConnectRetrying" xml:space="preserve">
+        <value>Trying to connect to {0}, {1} seconds remaining</value>
+    </data>
+    <data name="StartupConnectSucceededDelay" xml:space="preserve">
+        <value>Connected to {0}, starting tasks in 5 seconds</value>
     </data>
     <data name="Warning_CannotConnect" xml:space="preserve">
         <value>Unable to connect to {0}</value>
