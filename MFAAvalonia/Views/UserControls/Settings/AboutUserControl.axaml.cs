@@ -77,9 +77,9 @@ public partial class AboutUserControl : UserControl
             return;
         }
 
-        var baseDirectory = AppContext.BaseDirectory;
+        var baseDirectory = AppPaths.DataRoot;
         var debugDirectory = Path.Combine(baseDirectory, "debug");
-        var logsDirectory = Path.Combine(baseDirectory, "logs");
+        var logsDirectory = AppPaths.LogsDirectory;
 
         try
         {

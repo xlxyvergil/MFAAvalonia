@@ -32,7 +32,7 @@ public partial class ChangelogViewModel : ViewModelBase
         };
         try
         {
-            var resourcePath = Path.Combine(AppContext.BaseDirectory, "resource");
+            var resourcePath = AppPaths.ResourceDirectory;
             var mdPath = Path.Combine(resourcePath, ReleaseFileName);
 
             
@@ -74,7 +74,7 @@ public partial class ChangelogViewModel : ViewModelBase
         if (viewModel.DoNotRemindThisChangelogAgain) return false;
         try
         {
-            var resourcePath = Path.Combine(AppContext.BaseDirectory, "resource");
+            var resourcePath = AppPaths.ResourceDirectory;
             var mdPath = Path.Combine(resourcePath, ChangelogFileName);
 
             if (File.Exists(mdPath))

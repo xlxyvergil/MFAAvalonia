@@ -129,20 +129,20 @@ public static class AgentHelper
 
         LoggerHelper.Info($"Agent Client Hash: {ctx.Client?.GetHashCode()}");
 
-        if (!Directory.Exists($"{AppContext.BaseDirectory}"))
-            Directory.CreateDirectory($"{AppContext.BaseDirectory}");
+        if (!Directory.Exists(AppPaths.DataRoot))
+            Directory.CreateDirectory(AppPaths.DataRoot);
 
-        var program = MaaInterface.ReplacePlaceholder(agentConfig.ChildExec, AppContext.BaseDirectory, true);
+        var program = MaaInterface.ReplacePlaceholder(agentConfig.ChildExec, AppPaths.DataRoot, true);
         if (IsPathLike(program))
-            program = Path.GetFullPath(program, AppContext.BaseDirectory);
+            program = Path.GetFullPath(program, AppPaths.DataRoot);
 
         var rawArgs = agentConfig.ChildArgs ?? [];
-        var replacedArgs = MaaInterface.ReplacePlaceholder(rawArgs, AppContext.BaseDirectory, true)
+        var replacedArgs = MaaInterface.ReplacePlaceholder(rawArgs, AppPaths.DataRoot, true)
             .Select(arg =>
             {
                 if (IsPathLike(arg))
                 {
-                    try { return Path.GetFullPath(arg, AppContext.BaseDirectory); }
+                    try { return Path.GetFullPath(arg, AppPaths.DataRoot); }
                     catch (Exception) { return arg; }
                 }
                 return arg;
@@ -160,7 +160,7 @@ public static class AgentHelper
         var startInfo = new ProcessStartInfo
         {
             FileName = executablePath,
-            WorkingDirectory = AppContext.BaseDirectory,
+            WorkingDirectory = AppPaths.DataRoot,
             Arguments = $"{(program!.Contains("python") && replacedArgs.Contains(".py") && !replacedArgs.Any(arg => arg.Contains("-u")) ? "-u " : "")}{string.Join(" ", replacedArgs)} {ctx.Client.Id}",
             UseShellExecute = false,
             RedirectStandardError = true,

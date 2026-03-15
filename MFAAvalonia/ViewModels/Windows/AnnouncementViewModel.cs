@@ -127,7 +127,7 @@ public partial class AnnouncementViewModel : ViewModelBase
         {
             IsLoading = true;
 
-            var resourcePath = Path.Combine(AppContext.BaseDirectory, "resource");
+            var resourcePath = AppPaths.ResourceDirectory;
             var announcementDir = Path.Combine(resourcePath, AnnouncementFolder);
 
             if (!Directory.Exists(announcementDir))
@@ -264,7 +264,7 @@ public partial class AnnouncementViewModel : ViewModelBase
                 return;
             }
 
-            var resourcePath = Path.Combine(AppContext.BaseDirectory, "resource");
+            var resourcePath = AppPaths.ResourceDirectory;
             var announcementDir = Path.Combine(resourcePath, AnnouncementFolder);
 
             var scanResult = await Task.Run(() =>

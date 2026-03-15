@@ -87,12 +87,10 @@ public static class JsonHelper
     // 辅助方法：获取配置文件路径
     private static string GetConfigPath(string configName)
     {
-        var configDir = Path.Combine(AppContext.BaseDirectory, "config");
-        if (!Directory.Exists(configDir))
-        {
-            Directory.CreateDirectory(configDir);
-        }
-        return Path.Combine(configDir, $"{configName}.json");
+        AppPaths.Initialize();
+        if (!Directory.Exists(AppPaths.ConfigDirectory))
+            Directory.CreateDirectory(AppPaths.ConfigDirectory);
+        return Path.Combine(AppPaths.ConfigDirectory, $"{configName}.json");
     }
 
     // 辅助方法：尝试序列化（带线程错误检测）

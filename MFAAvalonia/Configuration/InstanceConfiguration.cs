@@ -14,8 +14,7 @@ public sealed class InstanceConfiguration
     private Dictionary<string, object> _config;
     private volatile bool _isDeleted;
 
-    internal static readonly string InstancesDir = Path.Combine(
-        AppContext.BaseDirectory, "config", "instances");
+    internal static string InstancesDir => AppPaths.InstancesDirectory;
 
     public InstanceConfiguration(string instanceId)
     {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Runtime.Versioning;
@@ -13,6 +14,9 @@ public static class PrivatePathHelper
 {
     // 缓存已加载的库句柄，避免重复加载
     private static readonly Dictionary<string, IntPtr> _loadedLibraries = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object _resolverLock = new();
+    private static bool _managedResolverRegistered;
+    private static bool _nativeResolverRegistered;
 
     // Windows API: 添加 DLL 搜索目录
     [SupportedOSPlatform("windows")]
@@ -29,6 +33,50 @@ public static class PrivatePathHelper
         {
             string baseDirectory = AppContext.BaseDirectory;
             var libsPath = Path.Combine(baseDirectory, AppContext.GetData("SubdirectoriesToProbe") as string ?? "libs");
+
+            lock (_resolverLock)
+            {
+                if (!_managedResolverRegistered)
+                {
+                    AssemblyLoadContext.Default.Resolving += (_, assemblyName) =>
+                    {
+                        try
+                        {
+                            var assemblyPath = FindManagedAssemblyInLibs(libsPath, assemblyName);
+                            if (assemblyPath == null)
+                            {
+                                return null;
+                            }
+
+                            var loadedAssembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
+
+                            try
+                            {
+                                LoggerHelper.Info($"Loaded managed assembly from libs: {assemblyPath}");
+                            }
+                            catch
+                            {
+                            }
+
+                            return loadedAssembly;
+                        }
+                        catch (Exception ex)
+                        {
+                            try
+                            {
+                                LoggerHelper.Warning($"Failed to resolve managed assembly '{assemblyName.FullName}': {ex.Message}");
+                            }
+                            catch
+                            {
+                            }
+
+                            return null;
+                        }
+                    };
+
+                    _managedResolverRegistered = true;
+                }
+            }
 
             // Windows: 使用 AddDllDirectory API 添加搜索路径（更高效，避免黑魔法）
             if (OperatingSystem.IsWindows())
@@ -56,55 +104,63 @@ public static class PrivatePathHelper
                 }
             }
 
-            AssemblyLoadContext.Default.ResolvingUnmanagedDll += (assembly, libraryName) =>
+            lock (_resolverLock)
             {
-                try
+                if (!_nativeResolverRegistered)
                 {
-                    // 检查缓存
-                    if (_loadedLibraries.TryGetValue(libraryName, out IntPtr cachedHandle))
+                    AssemblyLoadContext.Default.ResolvingUnmanagedDll += (assembly, libraryName) =>
                     {
-                        return cachedHandle;
-                    }
-
-                    string? libraryPath = null;
-
-                    // 首先在 libs 文件夹中查找
-                    if (Directory.Exists(libsPath))
-                    {
-                        libraryPath = FindLibraryInLibs(libsPath, libraryName);
-                    }
-
-                    if (libraryPath != null)
-                    {
-                        IntPtr handle = NativeLibrary.Load(libraryPath);
-                        _loadedLibraries[libraryName] = handle;
-
                         try
                         {
-                            LoggerHelper.Info($"Loaded native library: {libraryPath}");
+                            // 检查缓存
+                            if (_loadedLibraries.TryGetValue(libraryName, out IntPtr cachedHandle))
+                            {
+                                return cachedHandle;
+                            }
+
+                            string? libraryPath = null;
+
+                            // 首先在 libs 文件夹中查找
+                            if (Directory.Exists(libsPath))
+                            {
+                                libraryPath = FindLibraryInLibs(libsPath, libraryName);
+                            }
+
+                            if (libraryPath != null)
+                            {
+                                IntPtr handle = NativeLibrary.Load(libraryPath);
+                                _loadedLibraries[libraryName] = handle;
+
+                                try
+                                {
+                                    LoggerHelper.Info($"Loaded native library: {libraryPath}");
+                                }
+                                catch { }
+
+                                return handle;
+                            }
+
+                            // 返回 IntPtr.Zero 让系统使用默认的解析逻辑
+                            return IntPtr.Zero;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            try
+                            {
+                                LoggerHelper.Warning($"Failed to resolve native library '{libraryName}': {ex.Message}");
+                            }
+                            catch { }
+                            return IntPtr.Zero;
+                        }
+                    };
 
-                        return handle;
-                    }
-
-                    // 返回 IntPtr.Zero 让系统使用默认的解析逻辑
-                    return IntPtr.Zero;
+                    _nativeResolverRegistered = true;
                 }
-                catch (Exception ex)
-                {
-                    try
-                    {
-                        LoggerHelper.Warning($"Failed to resolve native library '{libraryName}': {ex.Message}");
-                    }
-                    catch { }
-                    return IntPtr.Zero;
-                }
-            };
+            }
 
             try
             {
-                LoggerHelper.Info("Native library resolver setup completed using AssemblyLoadContext.ResolvingUnmanagedDll");
+                LoggerHelper.Info($"Library resolver setup completed. libsPath={libsPath}, libsExists={Directory.Exists(libsPath)}");
             }
             catch { }
         }
@@ -115,6 +171,27 @@ public static class PrivatePathHelper
                 LoggerHelper.Warning($"Failed to setup native library resolver: {ex.Message}");
             }
             catch { }
+        }
+    }
+
+    /// <summary>
+    /// 在 libs 文件夹中查找托管程序集
+    /// </summary>
+    private static string? FindManagedAssemblyInLibs(string libsPath, AssemblyName assemblyName)
+    {
+        try
+        {
+            if (!Directory.Exists(libsPath) || string.IsNullOrWhiteSpace(assemblyName.Name))
+            {
+                return null;
+            }
+
+            var assemblyPath = Path.Combine(libsPath, assemblyName.Name + ".dll");
+            return File.Exists(assemblyPath) ? assemblyPath : null;
+        }
+        catch
+        {
+            return null;
         }
     }
 

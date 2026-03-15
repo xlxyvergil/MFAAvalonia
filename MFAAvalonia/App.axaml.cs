@@ -68,6 +68,7 @@ public partial class App : Application
         try
         {
             base.Initialize();
+            AppPaths.Initialize();
             LoggerHelper.InitializeLogger();
             AvaloniaXamlLoader.Load(this);
             LanguageHelper.Initialize();

@@ -13,11 +13,11 @@ public class MarkdownExtension : MarkupExtension
 
     public override object ProvideValue(IServiceProvider serviceProvider)
     {
-        var resourcePath = Path.Combine(AppContext.BaseDirectory, "resource");
+        var resourcePath = AppPaths.ResourceDirectory;
 
         var targetDir = string.IsNullOrEmpty(Directory)
             ? resourcePath
-            : Path.GetFullPath(Directory, AppContext.BaseDirectory);
+            : Path.GetFullPath(Directory, AppPaths.DataRoot);
 
         // 创建 MFALinkCommand 并同步设置 CurrentDocumentPath
         var linkCommand = new MFALinkCommand

@@ -42,7 +42,7 @@ public partial class MFAConfiguration(string name, string fileName, Dictionary<s
 
     private string GetConfigFilePath() =>
         Path.Combine(
-            AppContext.BaseDirectory, "config",
+            AppPaths.ConfigDirectory,
             $"{FileName}.json");
 
         public void SetValue(string key, object? value)

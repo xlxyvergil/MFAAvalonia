@@ -10,11 +10,16 @@ namespace MFAAvalonia.Configuration;
 public static class GlobalConfiguration
 {
     private static readonly object _fileLock = new();
-    private static readonly string _configPath = Path.Combine(
-        AppContext.BaseDirectory,
-        "appsettings.json");
+    private static string ConfigFilePath
+    {
+        get
+        {
+            AppPaths.Initialize();
+            return AppPaths.GlobalConfigPath;
+        }
+    }
 
-    public static string ConfigPath => _configPath;
+    public static string ConfigPath => ConfigFilePath;
     public static bool HasFileAccessError { get; private set; }
     public static string? LastFileAccessErrorMessage { get; private set; }
 
@@ -22,15 +27,16 @@ public static class GlobalConfiguration
     {
         try
         {
-            if (!File.Exists(_configPath))
+            var configPath = ConfigFilePath;
+            if (!File.Exists(configPath))
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(_configPath));
-                File.WriteAllText(_configPath, "{}");
+                Directory.CreateDirectory(Path.GetDirectoryName(configPath));
+                File.WriteAllText(configPath, "{}");
             }
 
             var builder = new ConfigurationBuilder()
-                .SetBasePath(Path.GetDirectoryName(_configPath))
-                .AddJsonFile(_configPath, optional: false, reloadOnChange: false);
+                .SetBasePath(Path.GetDirectoryName(configPath))
+                .AddJsonFile(configPath, optional: false, reloadOnChange: false);
 
             return builder.Build();
         }
@@ -59,17 +65,18 @@ public static class GlobalConfiguration
             try
             {
                 var configDict = new Dictionary<string, string>();
-                if (File.Exists(_configPath))
+                var configPath = ConfigFilePath;
+                if (File.Exists(configPath))
                 {
-                    var json = File.ReadAllText(_configPath);
+                    var json = File.ReadAllText(configPath);
                     configDict = JsonSerializer.Deserialize<Dictionary<string, string>>(json)
                         ?? new Dictionary<string, string>();
                 }
 
                 configDict[key] = value;
 
-                Directory.CreateDirectory(Path.GetDirectoryName(_configPath));
-                File.WriteAllText(_configPath,
+                Directory.CreateDirectory(Path.GetDirectoryName(configPath));
+                File.WriteAllText(configPath,
                     JsonSerializer.Serialize(configDict, new JsonSerializerOptions
                     {
                         WriteIndented = true
@@ -96,7 +103,7 @@ public static class GlobalConfiguration
     {
         HasFileAccessError = true;
         LastFileAccessErrorMessage = ex.Message;
-        LoggerHelper.Error($"全局配置文件访问失败: {_configPath}", ex);
+        LoggerHelper.Error($"全局配置文件访问失败: {ConfigFilePath}", ex);
     }
 
     public static string GetTimer(int i, string defaultValue)

@@ -211,7 +211,7 @@ public class HotkeyPrimaryElection : IDisposable
 
     private static string GetStatePath()
     {
-        var appData = Path.Combine(AppContext.BaseDirectory, "config");
+        var appData = AppPaths.ConfigDirectory;
         Directory.CreateDirectory(appData);
         return Path.Combine(appData, StateFileName);
     }  

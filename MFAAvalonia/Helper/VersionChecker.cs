@@ -457,7 +457,7 @@ public static class VersionChecker
                 }
             }
         });
-        var tempPath = Path.Combine(AppContext.BaseDirectory, "temp_res");
+        var tempPath = AppPaths.TempResourceDirectory;
         Directory.CreateDirectory(tempPath);
         string fileExtension = GetFileExtensionFromUrl(downloadUrl);
         if (string.IsNullOrEmpty(fileExtension))
@@ -523,16 +523,12 @@ public static class VersionChecker
 
         if (ContainsCoreApplicationFiles(tempExtractDir))
         {
-            Dismiss(sukiToast);
-            ToastHelper.Warn(LangKeys.Warning.ToLocalization(), "资源热更新包包含核心程序文件，已取消本次热更新，请使用完整程序更新。", -1);
-            Instances.RootViewModel.SetUpdating(false);
-            LoggerHelper.Warning($"取消资源热更新：检测到核心程序文件，目录: {tempExtractDir}");
-            return;
+            LoggerHelper.Warning($"资源包包含核心程序文件，继续沿用现有更新流程: {tempExtractDir}");
         }
 
-        var wpfDir = AppContext.BaseDirectory;
-        var resourcePath = Path.Combine(wpfDir, "resource");
-        var agentPath = Path.Combine(wpfDir, "agent");
+        var wpfDir = AppPaths.DataRoot;
+        var resourcePath = AppPaths.ResourceDirectory;
+        var agentPath = AppPaths.AgentDirectory;
         // 获取当前运行的可执行文件路径（最可靠的方式，即使用户重命名了文件也能正确获取）
         var exeName = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
         LoggerHelper.Info($"Current process executable: {exeName}");
@@ -613,7 +609,7 @@ public static class VersionChecker
                 {
                     var stringBuilder = new StringBuilder(DateTime.Now.ToString("yyyy-MM-dd"));
                     stringBuilder.AppendLine(changes);
-                    await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "changes.json"), stringBuilder.ToString());
+                    await File.WriteAllTextAsync(AppPaths.ChangesPath, stringBuilder.ToString());
                 }
                 try
                 {
@@ -623,7 +619,7 @@ public static class VersionChecker
                         var delPaths = changesJson.Deleted
                             .Select(del =>
                             {
-                                var isSafe = TryGetSafeUpdateTargetPath(AppContext.BaseDirectory, del, out var fullPath);
+                                var isSafe = TryGetSafeUpdateTargetPath(wpfDir, del, out var fullPath);
                                 if (!isSafe)
                                     LoggerHelper.Warning($"跳过越界删除路径: {del}");
                                 return (isSafe, fullPath);
@@ -651,7 +647,7 @@ public static class VersionChecker
                         var delPaths = changesJson.Modified
                             .Select(del =>
                             {
-                                var isSafe = TryGetSafeUpdateTargetPath(AppContext.BaseDirectory, del, out var fullPath);
+                                var isSafe = TryGetSafeUpdateTargetPath(wpfDir, del, out var fullPath);
                                 if (!isSafe)
                                     LoggerHelper.Warning($"跳过越界修改路径: {del}");
                                 return (isSafe, fullPath);
@@ -684,39 +680,11 @@ public static class VersionChecker
 
         SetProgress(progress, 1);
 
-        // 通过程序集名称检测解压目录中是否包含新版本的 MFAAvalonia 可执行文件
-        var newMFAExe = FindMFAExecutableByAssemblyName(tempExtractDir);
-        var containsMFAExecutable = !string.IsNullOrEmpty(newMFAExe);
-        string newMFAExeTargetPath = string.Empty;
-        if (containsMFAExecutable)
-        {
-            newMFAExeTargetPath = Path.Combine(wpfDir, Path.GetFileName(newMFAExe));
-            LoggerHelper.Info($"资源包中检测到 MFAAvalonia 可执行文件: {newMFAExe}");
-        }
-
-        if (containsMFAExecutable
-            && !string.IsNullOrWhiteSpace(exeName)
-            && File.Exists(exeName)
-            && Path.GetDirectoryName(exeName)?.Equals(wpfDir, StringComparison.OrdinalIgnoreCase) == true
-            && !string.IsNullOrWhiteSpace(newMFAExeTargetPath)
-            && !Path.GetFullPath(exeName).Equals(Path.GetFullPath(newMFAExeTargetPath), StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                LoggerHelper.Info($"检测到主程序文件名变更，备份当前可执行文件: {exeName} -> {newMFAExeTargetPath}");
-                DeleteFileWithBackup(exeName);
-            }
-            catch (Exception ex)
-            {
-                LoggerHelper.Warning($"备份当前可执行文件失败: {exeName}, error: {ex.Message}");
-            }
-        }
-
         // 统一使用 CopyAndDelete 覆盖文件（旧文件被锁定时会自动备份为 .backupMFA）
         var di = new DirectoryInfo(originPath);
         if (di.Exists)
         {
-            await CopyAndDelete(originPath, wpfDir, progress, true);
+            await CopyAndDelete(originPath, wpfDir, progress, true, default, true);
         }
 
         // 最后再更新 interface.json，避免先写元数据后拷资源导致半更新状态
@@ -741,29 +709,6 @@ public static class VersionChecker
             Dismiss(sukiToast);
         shouldShowToast = true;
         action?.Invoke();
-
-        // 确定要启动的可执行文件：优先使用新版本，否则回退到当前版本
-        if (containsMFAExecutable)
-        {
-            // 资源包包含新版本 MFA，在目标目录中通过程序集名称查找新版本 exe
-            var newExeInTarget = FindMFAExecutableByAssemblyName(wpfDir);
-            if (!string.IsNullOrEmpty(newExeInTarget))
-            {
-                exeName = newExeInTarget;
-                LoggerHelper.Info($"将启动新版本可执行文件: {exeName}");
-            }
-        }
-
-        // 如果当前进程的可执行文件不存在（可能被更新覆盖/重命名），则在目标目录中查找
-        if (string.IsNullOrEmpty(exeName) || !File.Exists(exeName))
-        {
-            var foundExe = FindMFAExecutableInDirectory(wpfDir);
-            if (!string.IsNullOrEmpty(foundExe))
-            {
-                exeName = foundExe;
-                LoggerHelper.Info($"Using found executable from target directory: {exeName}");
-            }
-        }
 
         // 重启前执行清理（保存配置、释放资源等）
         DispatcherHelper.PostOnMainThread(() => Instances.RootView.BeforeClosed(true, true));
@@ -885,14 +830,17 @@ public static class VersionChecker
         string oldPath,
         ProgressBar? progressBar = null,
         bool saveAnnouncement = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool skipCoreApplicationFiles = false)
     {
         // 1. 参数合法性验证（保持原有逻辑，空路径/源目录不存在直接返回）
         if (string.IsNullOrWhiteSpace(newPath) || string.IsNullOrWhiteSpace(oldPath) || !Directory.Exists(newPath))
             return;
 
         // 2. 统计源目录总文件数（用于进度条初始化）
-        int totalFileCount = Directory.EnumerateFiles(newPath, "*", SearchOption.AllDirectories).Count();
+        int totalFileCount = Directory.EnumerateFiles(newPath, "*", SearchOption.AllDirectories)
+            .Count(file => !skipCoreApplicationFiles
+                           || !IsCoreApplicationFile(Path.GetRelativePath(newPath, file)));
 
         // 3. 初始化进度条（UI操作需通过 Invoke 确保线程安全）
         DispatcherHelper.PostOnMainThread(() =>
@@ -912,7 +860,7 @@ public static class VersionChecker
         {
             // 5. 递归复制目录（核心逻辑，异步支持）
             await CopyDirectoryRecursively(
-                newPath, oldPath, progressBar, saveAnnouncement, cancellationToken, progressCounter);
+                newPath, oldPath, newPath, progressBar, saveAnnouncement, cancellationToken, progressCounter, skipCoreApplicationFiles);
         }
         catch (OperationCanceledException)
         {
@@ -931,10 +879,12 @@ public static class VersionChecker
     async private static Task CopyDirectoryRecursively(
         string sourceDir,
         string targetDir,
+        string sourceRootDir,
         ProgressBar? progressBar,
         bool saveAnnouncement,
         CancellationToken cancellationToken,
-        ProgressCounter progressCounter)
+        ProgressCounter progressCounter,
+        bool skipCoreApplicationFiles)
     {
         // 响应取消请求
         cancellationToken.ThrowIfCancellationRequested();
@@ -951,6 +901,12 @@ public static class VersionChecker
             cancellationToken.ThrowIfCancellationRequested();
 
             string fileName = Path.GetFileName(sourceFile);
+            string relativePath = Path.GetRelativePath(sourceRootDir, sourceFile);
+            if (skipCoreApplicationFiles && IsCoreApplicationFile(relativePath))
+            {
+                LoggerHelper.Warning($"Skip copying core application file into resource data directory: {relativePath}");
+                continue;
+            }
             string targetFile = Path.Combine(targetDir, fileName);
 
             // 9. 公告文件特殊处理（仅当 saveAnnouncement 为 true 时执行）
@@ -1029,7 +985,7 @@ public static class VersionChecker
             string targetSubDir = Path.Combine(targetDir, subDirName);
 
             await CopyDirectoryRecursively(
-                sourceSubDir, targetSubDir, progressBar, saveAnnouncement, cancellationToken, progressCounter);
+                sourceSubDir, targetSubDir, sourceRootDir, progressBar, saveAnnouncement, cancellationToken, progressCounter, skipCoreApplicationFiles);
         }
     }
 
@@ -1193,7 +1149,7 @@ public static class VersionChecker
 
 
             // 准备临时目录
-            var tempPath = Path.Combine(AppContext.BaseDirectory, "temp_mfa");
+            var tempPath = AppPaths.TempMfaDirectory;
             Directory.CreateDirectory(tempPath);
 
             // 下载更新包
@@ -1240,7 +1196,7 @@ public static class VersionChecker
             SetProgress(progress, 40);
             
             // 准备备份目录
-            var backupDir = Path.Combine(AppContext.BaseDirectory, "backup", DateTime.Now.ToString("yyyyMMddHHmmss"));
+            var backupDir = Path.Combine(AppPaths.BackupDirectory, DateTime.Now.ToString("yyyyMMddHHmmss"));
             Directory.CreateDirectory(backupDir);
 
             // 执行文件替换
@@ -1569,7 +1525,7 @@ public static class VersionChecker
             }
 
             // 下载与解压（优化为使用DownloadWithRetry）
-            var tempPath = Path.Combine(AppContext.BaseDirectory, "temp_maafw");
+            var tempPath = AppPaths.TempMaaFwDirectory;
             Directory.CreateDirectory(tempPath);
             var tempZip = Path.Combine(tempPath, $"maafw_{latestVersion}.zip");
             SetText(textBlock, LangKeys.Downloading.ToLocalization());
@@ -2672,7 +2628,7 @@ public static class VersionChecker
             var bodyContent = releaseData?[from]?.ToString();
             if (!string.IsNullOrWhiteSpace(bodyContent) && bodyContent != "placeholder")
             {
-                var resourceDirectory = Path.Combine(AppContext.BaseDirectory, "resource");
+                var resourceDirectory = AppPaths.ResourceDirectory;
                 Directory.CreateDirectory(resourceDirectory);
                 var filePath = Path.Combine(resourceDirectory, ChangelogViewModel.ReleaseFileName);
                 File.WriteAllText(filePath, bodyContent);
@@ -2692,7 +2648,7 @@ public static class VersionChecker
             var bodyContent = releaseData?[from]?.ToString();
             if (!string.IsNullOrWhiteSpace(bodyContent) && bodyContent != "placeholder")
             {
-                var resourceDirectory = Path.Combine(AppContext.BaseDirectory, "resource");
+                var resourceDirectory = AppPaths.ResourceDirectory;
                 Directory.CreateDirectory(resourceDirectory);
                 var filePath = Path.Combine(resourceDirectory, ChangelogViewModel.ChangelogFileName);
                 File.WriteAllText(filePath, bodyContent);

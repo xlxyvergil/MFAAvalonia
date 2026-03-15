@@ -332,7 +332,7 @@ public static partial class Instances
     public static string GetExecutablePath()
     {
         // 兼容.NET 5+环境
-        return Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? AppContext.BaseDirectory;
+        return Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? AppPaths.InstallRoot;
     }
 
     public static void TryBeforeClosed() => TryBeforeClosed(false, true);

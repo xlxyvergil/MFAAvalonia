@@ -404,7 +404,7 @@ public sealed class MaaProcessorManager
     /// </summary>
     private void MigrateLegacyConfigs()
     {
-        var configDir = Path.Combine(AppContext.BaseDirectory, "config");
+        var configDir = AppPaths.ConfigDirectory;
         if (!Directory.Exists(configDir)) return;
 
         var instancesDir = Path.Combine(configDir, "instances");

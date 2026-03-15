@@ -50,7 +50,7 @@ public class MaaProcessor
     private readonly object _commandThreadLock = new();
     private readonly CancellationTokenSource _commandThreadCts = new();
     private Thread? _commandThread;
-    public static string Resource => Path.Combine(AppContext.BaseDirectory, "resource");
+    public static string Resource => AppPaths.ResourceDirectory;
     public static string ResourceBase => Path.Combine(Resource, "base");
     public static ObservableCollection<MaaProcessor> Processors { get; } = new();
     public static MaaToolkit Toolkit { get; } = new(true);
@@ -408,11 +408,11 @@ public class MaaProcessor
     /// </summary>
     public static string? GetInterfaceFilePath()
     {
-        var jsoncPath = Path.Combine(AppContext.BaseDirectory, "interface.jsonc");
+        var jsoncPath = AppPaths.InterfaceJsoncPath;
         if (File.Exists(jsoncPath))
             return jsoncPath;
 
-        var jsonPath = Path.Combine(AppContext.BaseDirectory, "interface.json");
+        var jsonPath = AppPaths.InterfaceJsonPath;
         if (File.Exists(jsonPath))
             return jsonPath;
 
@@ -511,7 +511,7 @@ public class MaaProcessor
             foreach (var customResource in value?.Resource ?? Enumerable.Empty<MaaInterface.MaaInterfaceResource>())
             {
                 var nameKey = customResource.Name?.Trim() ?? string.Empty;
-                var paths = MaaInterface.ReplacePlaceholder(customResource.Path ?? new(), AppContext.BaseDirectory);
+                var paths = MaaInterface.ReplacePlaceholder(customResource.Path ?? new(), AppPaths.DataRoot);
                 customResource.ResolvedPath = paths;
                 value!.Resources[nameKey] = customResource;
             }
@@ -543,7 +543,7 @@ public class MaaProcessor
                 // 加载多语言配置
                 if (value.Languages is { Count: > 0 })
                 {
-                    LanguageHelper.LoadLanguagesFromInterface(value.Languages, AppContext.BaseDirectory);
+                    LanguageHelper.LoadLanguagesFromInterface(value.Languages, AppPaths.DataRoot);
                 }
 
                 if (MaaProcessorManager.IsInstanceCreated)
@@ -571,7 +571,7 @@ public class MaaProcessor
     /// </summary>
     async private static Task LoadContactAndDescriptionAsync(MaaInterface maaInterface)
     {
-        var projectDir = AppContext.BaseDirectory;
+        var projectDir = AppPaths.DataRoot;
 
         // 加载 Description
         if (!string.IsNullOrWhiteSpace(maaInterface.Description))
@@ -1053,7 +1053,7 @@ public class MaaProcessor
 
             if (controllerConfig?.AttachResourcePath != null)
             {
-                var attachedPaths = MaaInterface.ReplacePlaceholder(controllerConfig.AttachResourcePath, AppContext.BaseDirectory);
+                var attachedPaths = MaaInterface.ReplacePlaceholder(controllerConfig.AttachResourcePath, AppPaths.DataRoot);
                 if (attachedPaths != null)
                 {
                     resources.AddRange(attachedPaths.Select(Path.GetFullPath));
@@ -1135,7 +1135,7 @@ public class MaaProcessor
 
     private void ConfigureScreenshotTasker(MaaTasker tasker)
     {
-        var logDir = Path.Combine(AppContext.BaseDirectory, "logs", "log_screencap");
+        var logDir = Path.Combine(AppPaths.LogsDirectory, "log_screencap");
         // if (!Directory.Exists(logDir))
         //     Directory.CreateDirectory(logDir);
         LoggerHelper.Info("screenlog dir:" + logDir);
@@ -1169,7 +1169,7 @@ public class MaaProcessor
 
             if (controllerConfig?.AttachResourcePath != null)
             {
-                var attachedPaths = MaaInterface.ReplacePlaceholder(controllerConfig.AttachResourcePath, AppContext.BaseDirectory);
+                var attachedPaths = MaaInterface.ReplacePlaceholder(controllerConfig.AttachResourcePath, AppPaths.DataRoot);
                 if (attachedPaths != null)
                 {
                     resources.AddRange(attachedPaths.Select(Path.GetFullPath));
@@ -1294,15 +1294,15 @@ public class MaaProcessor
 
             try
             {
-                var tempMFADir = Path.Combine(AppContext.BaseDirectory, "temp_mfa");
+                var tempMFADir = AppPaths.TempMfaDirectory;
                 if (Directory.Exists(tempMFADir))
                     Directory.Delete(tempMFADir, true);
 
-                var tempMaaDir = Path.Combine(AppContext.BaseDirectory, "temp_maafw");
+                var tempMaaDir = AppPaths.TempMaaFwDirectory;
                 if (Directory.Exists(tempMaaDir))
                     Directory.Delete(tempMaaDir, true);
 
-                var tempResDir = Path.Combine(AppContext.BaseDirectory, "temp_res");
+                var tempResDir = AppPaths.TempResourceDirectory;
                 if (Directory.Exists(tempResDir))
                     Directory.Delete(tempResDir, true);
             }
@@ -1656,7 +1656,7 @@ public class MaaProcessor
                     Config.AdbDevice.AdbSerial,
                     Config.AdbDevice.ScreenCap, Config.AdbDevice.Input,
                     !string.IsNullOrWhiteSpace(Config.AdbDevice.Config) ? Config.AdbDevice.Config : "{}",
-                    Path.Combine(AppContext.BaseDirectory, "libs", "MaaAgentBinary")
+                    Path.Combine(AppPaths.InstallRoot, "libs", "MaaAgentBinary")
                 );
 
             case MaaControllerTypes.PlayCover:
@@ -1763,10 +1763,10 @@ public class MaaProcessor
                     }
                 }
             };
-            string resourceDir = Path.Combine(AppContext.BaseDirectory, "resource", "base");
+            string resourceDir = Path.Combine(AppPaths.ResourceDirectory, "base");
             if (!Directory.Exists(resourceDir))
-                Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, resourceDir));
-            JsonHelper.SaveJson(Path.Combine(AppContext.BaseDirectory, "interface.json"),
+                Directory.CreateDirectory(resourceDir);
+            JsonHelper.SaveJson(AppPaths.InterfaceJsonPath,
                 Interface, new MaaInterfaceSelectAdvancedConverter(true), new MaaInterfaceSelectOptionConverter(true));
             Name = Interface?.Label ?? string.Empty;
             NameFallBack = Interface?.Name ?? string.Empty;
@@ -1793,7 +1793,7 @@ public class MaaProcessor
             return (name, back, version, customTitle, fallBack);
         }
 
-        var interfacePath = GetInterfaceFilePath() ?? Path.Combine(AppContext.BaseDirectory, "interface.json");
+        var interfacePath = GetInterfaceFilePath() ?? AppPaths.InterfaceJsonPath;
         var interfaceFileName = Path.GetFileName(interfacePath);
         var defaultValue = new MaaInterface();
 
@@ -3882,7 +3882,7 @@ public class MaaProcessor
             var resourcePaths = new List<string>(originalPaths);
             // LoggerHelper.Info(LangKeys.RegisteringCustomRecognizer.ToLocalization());
             // LoggerHelper.Info(LangKeys.RegisteringCustomAction.ToLocalization());
-            resourcePaths.Add(Path.Combine(AppContext.BaseDirectory, "resource"));
+            resourcePaths.Add(AppPaths.ResourceDirectory);
             // 遍历所有资源路径，查找 custom 目录
             foreach (var resourcePath in resourcePaths)
             {

@@ -12,7 +12,7 @@ public class MFALinkCommand : ICommand
     public event EventHandler? CanExecuteChanged;
 
     // 新增：当前Markdown文档的路径（作为解析相对链接的基准）
-    public string? CurrentDocumentPath { get; set; } = AppContext.BaseDirectory;
+    public string? CurrentDocumentPath { get; set; } = AppPaths.DataRoot;
 
     public bool CanExecute(object? parameter) => true;
 

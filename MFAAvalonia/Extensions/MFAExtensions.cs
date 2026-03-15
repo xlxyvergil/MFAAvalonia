@@ -48,7 +48,7 @@ public static class MFAExtensions
         if (string.IsNullOrWhiteSpace(input))
             return string.Empty;
         if (string.IsNullOrWhiteSpace(projectDir))
-            projectDir = AppContext.BaseDirectory;
+            projectDir = AppPaths.DataRoot;
         try
         {
             // 1. 国际化处理（以$开头）

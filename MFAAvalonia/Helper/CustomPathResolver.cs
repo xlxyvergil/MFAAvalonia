@@ -90,7 +90,7 @@ public class CustomPathResolver : IPathResolver
         try
         {
             // 第一步：使用新的ResolveUrl解析路径（核心修改点）
-            var root = AssetPathRoot ?? AppContext.BaseDirectory;
+            var root = AssetPathRoot ?? AppPaths.DataRoot;
             string resolvedPath = relativeOrAbsolutePath.ResolveUrl(root);
             if (string.IsNullOrWhiteSpace(resolvedPath))
                 return null;

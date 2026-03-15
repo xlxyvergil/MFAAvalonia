@@ -78,7 +78,7 @@ public static class FileLogExporter
                     return; // 用户取消了操作
 
                 // 获取应用程序基目录
-                string baseDirectory = AppContext.BaseDirectory;
+                string baseDirectory = AppPaths.DataRoot;
 
                 // 获取符合条件的日志文件和图片文件
                 var eligibleFiles = await Task.Run(() => GetEligibleFiles(baseDirectory));

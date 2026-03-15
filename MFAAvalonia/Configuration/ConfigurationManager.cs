@@ -17,9 +17,14 @@ namespace MFAAvalonia.Configuration;
 
 public static class ConfigurationManager
 {
-    private static readonly string _configDir = Path.Combine(
-        AppContext.BaseDirectory,
-        "config");
+    private static string ConfigDir
+    {
+        get
+        {
+            AppPaths.Initialize();
+            return AppPaths.ConfigDirectory;
+        }
+    }
     public static readonly MFAConfiguration Maa = new("Maa", "maa_option", new Dictionary<string, object>());
     public static MFAConfiguration Current = new("Default", "config", new Dictionary<string, object>());
     public static InstanceConfiguration CurrentInstance => MaaProcessorManager.Instance?.Current?.InstanceConfiguration ?? new InstanceConfiguration("Default");
@@ -159,15 +164,16 @@ public static class ConfigurationManager
 
         var collection = new AvaloniaList<MFAConfiguration>();
 
-        var defaultConfigPath = Path.Combine(_configDir, "config.json");
-        if (!Directory.Exists(_configDir))
-            Directory.CreateDirectory(_configDir);
+        var configDir = ConfigDir;
+        var defaultConfigPath = Path.Combine(configDir, "config.json");
+        if (!Directory.Exists(configDir))
+            Directory.CreateDirectory(configDir);
         if (!File.Exists(defaultConfigPath))
             File.WriteAllText(defaultConfigPath, "{}");
-        if (ConfigName != "Default" && !File.Exists(Path.Combine(_configDir, $"mfa_{ConfigName}.json")))
+        if (ConfigName != "Default" && !File.Exists(Path.Combine(configDir, $"mfa_{ConfigName}.json")))
             ConfigName = "Default";
         collection.Add(Current.SetConfig(JsonHelper.LoadConfig("config", new Dictionary<string, object>())));
-        foreach (var file in Directory.EnumerateFiles(_configDir, "mfa_*.json"))
+        foreach (var file in Directory.EnumerateFiles(configDir, "mfa_*.json"))
         {
             var fileName = Path.GetFileNameWithoutExtension(file);
             if (fileName == "maa_option" || fileName == "config") continue;
@@ -202,7 +208,7 @@ public static class ConfigurationManager
 
     public static MFAConfiguration Add(string name)
     {
-        var configPath = Path.Combine(AppContext.BaseDirectory, "config");
+        var configPath = ConfigDir;
         var newConfigPath = Path.Combine(configPath, $"{name}.json");
         var newConfig = new MFAConfiguration(name.Equals("config", StringComparison.OrdinalIgnoreCase) ? "Default" : name, name.Equals("config", StringComparison.OrdinalIgnoreCase) ? name : $"mfa_{name}", new Dictionary<string, object>());
         Configs.Add(newConfig);

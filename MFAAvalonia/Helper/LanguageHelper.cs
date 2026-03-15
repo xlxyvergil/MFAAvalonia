@@ -113,7 +113,7 @@ public static class LanguageHelper
         if (languages == null || languages.Count == 0 || Langs.Count > 0)
             return;
 
-        var safeBasePath = basePath ?? AppContext.BaseDirectory;
+        var safeBasePath = basePath ?? AppPaths.DataRoot;
 
         foreach (var (langCode, relativePath) in languages)
         {

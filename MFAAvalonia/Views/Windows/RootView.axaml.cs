@@ -208,7 +208,7 @@ public partial class RootView : SukiWindow
     {
         if (AppRuntime.IsNewInstance)
         {
-            foreach (var rfile in Directory.EnumerateFiles(AppContext.BaseDirectory, "*.backupMFA", SearchOption.AllDirectories))
+            foreach (var rfile in Directory.EnumerateFiles(AppPaths.DataRoot, "*.backupMFA", SearchOption.AllDirectories))
             {
                 try
                 {
@@ -341,7 +341,7 @@ public partial class RootView : SukiWindow
 
                         if (!string.IsNullOrWhiteSpace(MaaProcessor.Interface?.Welcome))
                         {
-                            await AnnouncementViewModel.AddAnnouncementAsync(MaaProcessor.Interface.Welcome, projectDir: AppContext.BaseDirectory);
+                            await AnnouncementViewModel.AddAnnouncementAsync(MaaProcessor.Interface.Welcome, projectDir: AppPaths.DataRoot);
                         }
                     }));
 

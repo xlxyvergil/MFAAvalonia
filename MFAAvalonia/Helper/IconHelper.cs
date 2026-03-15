@@ -21,16 +21,17 @@ public static class IconHelper
     {
         try
         {
-            var exeDirectory = AppContext.BaseDirectory;
+            var dataDirectory = AppPaths.DataRoot;
+            var installDirectory = AppPaths.InstallRoot;
 
             // 尝试从 interface.json 同目录读取 icon 字段
-            var interfacePath = Path.Combine(exeDirectory, "interface.json");
+            var interfacePath = AppPaths.InterfaceJsonPath;
             if (File.Exists(interfacePath))
             {
                 var interfaceIcon = TryGetInterfaceIcon(interfacePath);
                 if (!string.IsNullOrWhiteSpace(interfaceIcon))
                 {
-                    var interfaceIconPath = Path.Combine(exeDirectory, interfaceIcon);
+                    var interfaceIconPath = Path.Combine(dataDirectory, interfaceIcon);
                     if (File.Exists(interfaceIconPath))
                     {
                         using var fileStream = File.OpenRead(interfaceIconPath);
@@ -40,9 +41,9 @@ public static class IconHelper
             }
 
             // 尝试从执行目录加载
-            var iconPath = Path.Combine(exeDirectory, "Assets", "logo.ico");
+            var iconPath = Path.Combine(installDirectory, "Assets", "logo.ico");
             if (!File.Exists(iconPath))
-                iconPath = Path.Combine(exeDirectory, "assets", "logo.ico");
+                iconPath = Path.Combine(installDirectory, "assets", "logo.ico");
             if (File.Exists(iconPath))
             {
                 using var fileStream = File.OpenRead(iconPath);
