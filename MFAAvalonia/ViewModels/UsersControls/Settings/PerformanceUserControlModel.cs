@@ -223,19 +223,19 @@ public partial class PerformanceUserControlModel : ViewModelBase
             {
                 var v1 = resource.SetOption_InferenceExecutionProvider(InferenceExecutionProvider.DirectML);
                 var v2 = resource.SetOption_InferenceDevice(option.Adapter.AdapterId);
-                LoggerHelper.Info($"{"Use DirectML: " + (v1 && v2 ? "succeed" : "failed")}");
+                LoggerHelper.Info("启用 DirectML：" + (v1 && v2 ? "成功" : "失败"));
             }
             else if (option.Device == InferenceDevice.CPU)
             {
                 var v1 = resource.SetOption_InferenceExecutionProvider(InferenceExecutionProvider.CPU);
                 var v2 = resource.SetOption_InferenceDevice(option.Device);
-                LoggerHelper.Info($"{"Use CPU: " + (v1 && v2 ? "succeed" : "failed")}");
+                LoggerHelper.Info("启用 CPU 推理：" + (v1 && v2 ? "成功" : "失败"));
             }
             else
             {
                 var v1 = resource.SetOption_InferenceExecutionProvider(InferenceExecutionProvider.Auto);
                 var v2 = resource.SetOption_InferenceDevice(option.Device);
-                LoggerHelper.Info($"{"Use GPU: " + (v1 && v2 ? "succeed" : "failed")}");
+                LoggerHelper.Info("启用 GPU 推理：" + (v1 && v2 ? "成功" : "失败"));
             }
         }
     }

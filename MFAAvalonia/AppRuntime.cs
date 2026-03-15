@@ -108,7 +108,7 @@ public static class AppRuntime
             }
             catch (Exception e)
             {
-                LoggerHelper.Error(e);
+                LoggerHelper.Error($"释放应用互斥锁失败：原因={e.Message}", e);
             }
         }
     }

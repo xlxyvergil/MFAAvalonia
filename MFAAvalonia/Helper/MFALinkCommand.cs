@@ -30,7 +30,7 @@ public class MFALinkCommand : ICommand
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"打开 Markdown 链接失败：链接={urlTxt}，原因={e.Message}", e);
         }
     }
 }

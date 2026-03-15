@@ -37,7 +37,7 @@ public static class BrushHelper
         }
         catch (FormatException e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"转换画刷失败：颜色字符串={normalizedString}，原因={e.Message}", e);
             return defaultBrush;
         }
     }
@@ -93,7 +93,7 @@ public static class BrushHelper
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"解析命名颜色失败：颜色名称={colorName}，原因={e.Message}", e);
             // 忽略转换错误
         }
 

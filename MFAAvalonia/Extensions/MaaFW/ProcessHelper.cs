@@ -289,7 +289,7 @@ public static class ProcessHelper
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"CloseProcessesByHWnd failed: {ex.Message}");
+            LoggerHelper.Warning($"按窗口句柄关闭进程失败：hWnd=0x{hwnd.ToInt64():X}，原因：{ex.Message}");
             return false;
         }
     }
@@ -526,11 +526,11 @@ public static class ProcessHelper
             using var process = Process.Start(psi);
             process?.WaitForExit(2000);
 
-            LoggerHelper.Info($"已使用 taskkill 强制终止进程 (PID: {processId})");
+            LoggerHelper.Info($"已使用 taskkill 强制终止进程：进程名={processName}，进程ID={processId}");
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"taskkill 失败，尝试备用方法: {ex.Message}");
+            LoggerHelper.Warning($"taskkill 终止进程失败，准备尝试 WMI：进程名={processName}，进程ID={processId}，原因={ex.Message}");
 
             try
             {
@@ -540,12 +540,12 @@ public static class ProcessHelper
                 foreach (ManagementObject obj in searcher.Get())
                 {
                     obj.InvokeMethod("Terminate", null);
-                    LoggerHelper.Info($"已使用 WMI 强制终止进程 (PID: {processId})");
+                    LoggerHelper.Info($"已使用 WMI 强制终止进程：进程名={processName}，进程ID={processId}");
                 }
             }
             catch (Exception wmiEx)
             {
-                LoggerHelper.Error($"WMI 终止进程失败: {wmiEx.Message}");
+                LoggerHelper.Error($"使用 WMI 终止进程失败：进程名={processName}，进程ID={processId}，原因={wmiEx.Message}", wmiEx);
             }
         }
     }
@@ -572,11 +572,11 @@ public static class ProcessHelper
             using var process = Process.Start(psi);
             process?.WaitForExit(2000);
 
-            LoggerHelper.Info($"已使用 kill -9 强制终止进程 (PID: {processId})");
+            LoggerHelper.Info($"已使用 kill -9 强制终止进程：进程ID={processId}");
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"kill -9 失败: {ex.Message}");
+            LoggerHelper.Error($"执行 kill -9 失败：进程ID={processId}，原因={ex.Message}", ex);
         }
     }
 
@@ -613,7 +613,7 @@ public static class ProcessHelper
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"执行命令失败: {fileName} {arguments}, 错误: {ex.Message}");
+            LoggerHelper.Error($"执行命令失败：file={fileName}, args={arguments}, 原因：{ex.Message}", ex);
             return null;
         }
     }
@@ -647,7 +647,7 @@ public static class ProcessHelper
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"执行命令失败: {fileName} {arguments}, 错误: {ex.Message}");
+            LoggerHelper.Error($"异步执行命令失败：file={fileName}, args={arguments}, 原因：{ex.Message}", ex);
             return null;
         }
     }
@@ -693,7 +693,7 @@ public static class ProcessHelper
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"执行 Shell 命令失败: {command}, 错误: {ex.Message}");
+            LoggerHelper.Error($"执行 Shell 命令失败：command={command}, 原因：{ex.Message}", ex);
             return null;
         }
     }
@@ -743,7 +743,7 @@ public static class ProcessHelper
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"执行 Shell 命令失败: {command}, 错误: {ex.Message}");
+            LoggerHelper.Error($"异步执行 Shell 命令失败：command={command}, 原因：{ex.Message}", ex);
             return null;
         }
     }

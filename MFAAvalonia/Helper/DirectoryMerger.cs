@@ -78,7 +78,7 @@ public static class DirectoryMerger
             }
             catch (Exception ex)
             {
-                LoggerHelper.Warning($"计算文件大小失败: {file}，错误: {ex.Message}");
+                LoggerHelper.Warning($"计算文件大小失败：文件={file}，原因={ex.Message}");
             }
         }
 
@@ -161,7 +161,7 @@ public static class DirectoryMerger
                     // && (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
                     )
                 {
-                    LoggerHelper.Info($"跳过文件: {tempPath}");
+                    LoggerHelper.Info($"已跳过文件：文件={tempPath}");
                     // 跳过的文件计入已处理大小
                     progressState.ProcessedSize += fileSize;
                     UpdateProgress(progressBar, progressState.ProcessedSize, totalSize);
@@ -169,7 +169,7 @@ public static class DirectoryMerger
                 }
 
                 // 复制文件（分块读取以实时更新进度）
-                LoggerHelper.Info($"Copying file: {tempPath} (Size: {FormatSize(fileSize)})");
+                LoggerHelper.Info($"开始复制文件：文件={tempPath}，大小={FormatSize(fileSize)}");
                 await using var sourceStream = File.OpenRead(file.FullName);
                 await using var destStream = File.Create(tempPath);
 
@@ -188,13 +188,13 @@ public static class DirectoryMerger
             }
             catch (IOException ex)
             {
-                LoggerHelper.Error($"IO错误: {ex.Message}，文件: {tempPath}");
+                LoggerHelper.Error($"复制文件时发生 IO 错误：文件={tempPath}，原因={ex.Message}", ex);
                 progressState.ProcessedSize += fileSize; // 失败文件也计入进度
                 UpdateProgress(progressBar, progressState.ProcessedSize, totalSize);
             }
             catch (Exception ex)
             {
-                LoggerHelper.Error($"处理文件错误: {ex.Message}，文件: {tempPath}");
+                LoggerHelper.Error($"处理文件失败：文件={tempPath}，原因={ex.Message}", ex);
                 progressState.ProcessedSize += fileSize;
                 UpdateProgress(progressBar, progressState.ProcessedSize, totalSize);
             }
@@ -239,7 +239,7 @@ public static class DirectoryMerger
             using var process = Process.Start(startInfo);
             if (process == null)
             {
-                LoggerHelper.Warning($"无法启动chmod进程，文件: {filePath}");
+                LoggerHelper.Warning($"无法启动 chmod 进程：文件={filePath}");
                 return;
             }
 
@@ -250,11 +250,11 @@ public static class DirectoryMerger
                 if (process.ExitCode != 0)
                 {
                     var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-                    LoggerHelper.Warning($"chmod设置文件权限失败 {filePath} (退出码: {process.ExitCode}): {error}");
+                    LoggerHelper.Warning($"chmod 设置文件权限失败：文件={filePath}，退出码={process.ExitCode}，错误输出={error}");
                 }
                 else
                 {
-                    LoggerHelper.Info($"已通过chmod设置文件权限: {filePath}");
+                    LoggerHelper.Info($"已通过 chmod 设置文件权限：文件={filePath}");
                 }
             }
         }
@@ -264,7 +264,7 @@ public static class DirectoryMerger
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"设置文件权限时发生错误 {filePath}: {ex.Message}");
+            LoggerHelper.Warning($"设置文件权限时发生错误：文件={filePath}，原因={ex.Message}");
         }
     }
 
@@ -290,7 +290,7 @@ public static class DirectoryMerger
             using var process = Process.Start(startInfo);
             if (process == null)
             {
-                LoggerHelper.Warning($"无法启动chmod进程，目录: {directoryPath}");
+                LoggerHelper.Warning($"无法启动 chmod 进程：目录={directoryPath}");
                 return;
             }
 
@@ -301,11 +301,11 @@ public static class DirectoryMerger
                 if (process.ExitCode != 0)
                 {
                     var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-                    LoggerHelper.Warning($"chmod设置目录权限失败 {directoryPath} (退出码: {process.ExitCode}): {error}");
+                    LoggerHelper.Warning($"chmod 设置目录权限失败：目录={directoryPath}，退出码={process.ExitCode}，错误输出={error}");
                 }
                 else
                 {
-                    LoggerHelper.Info($"已通过chmod设置目录权限: {directoryPath}");
+                    LoggerHelper.Info($"已通过 chmod 设置目录权限：目录={directoryPath}");
                 }
             }
         }
@@ -315,7 +315,7 @@ public static class DirectoryMerger
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"设置目录权限时发生错误 {directoryPath}: {ex.Message}");
+            LoggerHelper.Warning($"设置目录权限时发生错误：目录={directoryPath}，原因={ex.Message}");
         }
     }
 

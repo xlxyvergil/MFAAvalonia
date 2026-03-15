@@ -31,7 +31,7 @@ public class TimedWaitAction : IMaaCustomAction
                 target = target.AddDays(1);
 
             var waitTime = target - now;
-            LoggerHelper.Info($"[TimedWaitAction] 等待到 {target:HH:mm}，还需等待 {waitTime.TotalMinutes:F1} 分钟");
+            LoggerHelper.Info($"定时等待开始：target={target:yyyy-MM-dd HH:mm}, remainingMinutes={waitTime.TotalMinutes:F1}");
 
             // 分段等待，每30秒检查一次，避免长时间阻塞
             while (DateTime.Now < target)
@@ -42,12 +42,12 @@ public class TimedWaitAction : IMaaCustomAction
                 Thread.Sleep(sleepMs);
             }
 
-            LoggerHelper.Info("[TimedWaitAction] 已到达目标时间，继续执行");
+            LoggerHelper.Info($"定时等待结束：已到达目标时间 {target:yyyy-MM-dd HH:mm}，继续执行");
             return true;
         }
         catch (Exception e)
         {
-            LoggerHelper.Error($"[TimedWaitAction] Error: {e.Message}");
+            LoggerHelper.Error($"定时等待异常：{e.Message}", e);
             return false;
         }
     }

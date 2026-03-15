@@ -116,16 +116,16 @@ public static class AppPaths
     {
         try
         {
-            LoggerHelper.Info($"AppPaths InstallRoot: {InstallRoot}");
-            LoggerHelper.Info($"AppPaths DataRoot: {DataRoot}");
-            LoggerHelper.Info($"AppPaths IndependentDataRoot: {IsUsingIndependentDataRoot}");
+            LoggerHelper.Info($"应用安装目录：{InstallRoot}");
+            LoggerHelper.Info($"应用数据目录：{DataRoot}");
+            LoggerHelper.Info($"是否使用独立数据目录：{IsUsingIndependentDataRoot}");
 
             var backupCount = Directory.Exists(DataRoot)
                 ? Directory.EnumerateFiles(DataRoot, "*.backupMFA", SearchOption.AllDirectories).Count()
                 : 0;
             var tempDirExists = Directory.Exists(TempDirectory);
-            LoggerHelper.Info($"AppPaths BackupFiles: {backupCount}");
-            LoggerHelper.Info($"AppPaths TempDirectoryExists: {tempDirExists}");
+            LoggerHelper.Info($"备份文件数量：{backupCount}");
+            LoggerHelper.Info($"临时目录是否存在：{tempDirExists}");
         }
         catch
         {

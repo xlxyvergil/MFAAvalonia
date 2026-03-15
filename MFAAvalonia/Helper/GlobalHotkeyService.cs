@@ -44,7 +44,7 @@ public static class GlobalHotkeyService
 
     private static void InitializeAsPrimary()
     {
-        LoggerHelper.Info("GlobalHotkeyService: 作为主进程初始化");
+        LoggerHelper.Info("全局热键服务：作为主进程初始化。");
         try
         {
             _server = new HotkeyIpcServer();
@@ -53,19 +53,19 @@ public static class GlobalHotkeyService
             _hook.KeyPressed += HandleKeyEvent;
             _hook.RunAsync();
             var saved = HotkeyPrimaryElection.LoadState();
-            if (saved != null) LoggerHelper.Info($"GlobalHotkeyService: 恢复 {saved.Length} 个热键");
+            if (saved != null) LoggerHelper.Info($"全局热键服务：已恢复 {saved.Length} 个热键。");
             IsEnabled = true;
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"初始化全局热键主进程失败：原因={e.Message}", e);
             ToastHelper.Error(LangKeys.GlobalHotkeyServiceError.ToLocalization());
         }
     }
 
     private static void InitializeAsSecondary()
     {
-        LoggerHelper.Info("GlobalHotkeyService: 作为子进程初始化");
+        LoggerHelper.Info("全局热键服务：作为子进程初始化。");
         _client = new HotkeyIpcClient();
         _client.HotkeyTriggered += h => ExecuteHotkey(h);
         _client.Disconnected += OnPrimaryDisconnected;
@@ -75,33 +75,33 @@ public static class GlobalHotkeyService
 
     private static async Task ConnectToPrimaryAsync()
     {
-        LoggerHelper.Info("GlobalHotkeyService: 开始连接主进程...");
+        LoggerHelper.Info("全局热键服务：开始连接主进程。");
         for (int i = 0; i < 10 && _client != null; i++)
         {
             try
             {
-                LoggerHelper.Info($"GlobalHotkeyService: 连接尝试 {i + 1}/10...");
+                LoggerHelper.Info($"全局热键服务：连接尝试 {i + 1}/10。");
                 if (await _client.ConnectAsync())
                 {
-                    LoggerHelper.Info($"GlobalHotkeyService: 成功连接到主进程，注册 {_commands.Count} 个热键");
+                    LoggerHelper.Info($"全局热键服务：已连接到主进程，准备注册 {_commands.Count} 个热键。");
                     IsEnabled = true;
                     foreach (var h in _commands.Keys){
-                        LoggerHelper.Info($"GlobalHotkeyService: 向主进程注册热键 {h}");
+                        LoggerHelper.Info($"全局热键服务：向主进程注册热键 {h}。");
                         await _client.RegisterHotkeyAsync(h);
                     }
                     return;
                 }else
                 {
-                    LoggerHelper.Warning($"GlobalHotkeyService: 连接尝试 {i + 1} 返回 false");
+                    LoggerHelper.Warning($"全局热键服务：第 {i + 1} 次连接返回 false。");
                 }
             }
             catch (Exception ex)
             {
-                LoggerHelper.Warning($"GlobalHotkeyService: 连接尝试 {i + 1} 异常 - {ex.Message}");
+                LoggerHelper.Warning($"全局热键服务：第 {i + 1} 次连接异常，原因={ex.Message}");
             }
             await Task.Delay(500);
         }
-        LoggerHelper.Warning("GlobalHotkeyService: 无法连接主进程，尝试成为主进程");
+        LoggerHelper.Warning("全局热键服务：无法连接主进程，准备尝试成为主进程。");
         await TryBecomePrimaryAsync();
     }
 
@@ -149,7 +149,7 @@ public static class GlobalHotkeyService
                 {
                     if (cmd.CanExecute(null)) await Dispatcher.UIThread.InvokeAsync(() => cmd.Execute(null), DispatcherPriority.Background);
                 }
-                catch (Exception ex) { LoggerHelper.Error($"热键执行失败: {ex.Message}"); }
+                catch (Exception ex) { LoggerHelper.Error($"执行热键命令失败：原因={ex.Message}", ex); }
             }, noMessage: true);
     }
 
@@ -159,11 +159,11 @@ public static class GlobalHotkeyService
         bool localRegistered = _commands.ContainsKey(h);
         bool remoteRegistered = _server?.HasSubscription(h) == true;
         
-        LoggerHelper.Debug($"GlobalHotkeyService: 检测到按键 {h}, 本地注册={localRegistered}, 远程订阅={remoteRegistered}");
+        LoggerHelper.Debug($"全局热键服务：检测到按键={h}，本地已注册={localRegistered}，远程已订阅={remoteRegistered}");
         
         if (localRegistered || remoteRegistered)
         {
-            LoggerHelper.Info($"GlobalHotkeyService: 触发热键 {h}");
+            LoggerHelper.Info($"全局热键服务：已触发热键 {h}。");
             // 如果本地注册了，执行本地命令
             if (localRegistered)
                 ExecuteHotkey(h);
@@ -193,7 +193,7 @@ public static class GlobalHotkeyService
         if (g == null || c == null) return true;
         var (k, m) = Convert(g);
         var h = new HotkeyIdentifier(k, m);
-        LoggerHelper.Info($"Register Hotkey[{h}]");
+        LoggerHelper.Info($"全局热键服务：注册热键 {h}。");
         if (_commands.TryAdd(h, c))
         {
             if (!string.IsNullOrWhiteSpace(ownerResourceKey))

@@ -8,6 +8,8 @@ namespace MFAAvalonia.Helper;
 
 public static class TaskManager
 {
+    private static string FormatTaskPrefix(string prompt, string name) => $"{prompt}任务 {name}";
+
     /// <summary>
     /// 执行任务, 并带有更好的日志显示
     /// </summary>
@@ -23,7 +25,7 @@ public static class TaskManager
         bool noMessage = false)
     {
         if (!noMessage)
-            LoggerHelper.Info($"{prompt}任务 {name} 开始.");
+            LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}开始。");
 
         if (catchException)
         {
@@ -33,12 +35,12 @@ public static class TaskManager
             }
             catch (Exception e)
             {
-                LoggerHelper.Error(e.ToString());
+                LoggerHelper.Error($"{FormatTaskPrefix(prompt, name)}执行失败：{e.Message}", e);
             }
         }
         else action();
         if (!noMessage)
-            LoggerHelper.Info($"{prompt}任务 {name} 完成.");
+            LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}完成。");
     }
 
     public static void RunTask(
@@ -50,29 +52,22 @@ public static class TaskManager
         bool catchException = true,
         bool shouldLog = true)
     {
-        LoggerHelper.Info($"MFA异步任务 {name} 开始.");
-        try
+        LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}开始（异步）。");
+        _ = Task.Run(() =>
         {
-            Task.Run(() =>
+            try
             {
                 token.ThrowIfCancellationRequested();
                 action?.Invoke();
-            }, token);
-        }
-        catch (Exception ex) when (catchException && !(ex is OperationCanceledException))
-        {
-            var baseEx = ex.GetBaseException();
-            handleError?.Invoke(baseEx);
-            if (shouldLog) LoggerHelper.Error(ex.GetBaseException());
-        }
-        catch (OperationCanceledException) when (token.IsCancellationRequested)
-        {
-            throw;
-        }
-        finally
-        {
-            LoggerHelper.Info($"{prompt}MFA异步任务 {name} 已完成.");
-        }
+                LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}完成（异步）。");
+            }
+            catch (Exception ex) when (catchException && !(ex is OperationCanceledException))
+            {
+                var baseEx = ex.GetBaseException();
+                handleError?.Invoke(baseEx);
+                if (shouldLog) LoggerHelper.Error($"{FormatTaskPrefix(prompt, name)}执行失败：{baseEx.Message}", baseEx);
+            }
+        }, token);
     }
 
     /// <summary>
@@ -92,7 +87,7 @@ public static class TaskManager
         bool catchException = true,
         bool shouldLog = true)
     {
-        LoggerHelper.Info($"MFA异步任务 {name} 开始.");
+        LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}开始（异步）。");
         if (catchException)
         {
             var task = Task.Run(action);
@@ -102,13 +97,13 @@ public static class TaskManager
                 {
                     handleError?.Invoke();
                     if (shouldLog)
-                        LoggerHelper.Error(t.Exception.GetBaseException());
+                        LoggerHelper.Error($"{FormatTaskPrefix(prompt, name)}执行失败：{t.Exception.GetBaseException().Message}", t.Exception.GetBaseException());
                 }
             }, TaskContinuationOptions.OnlyOnFaulted);
         }
         else await Task.Run(action);
 
-        LoggerHelper.Info($"{prompt}MFA异步任务 {name} 已完成.");
+        LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}完成（异步）。");
     }
 
     public async static Task RunTaskAsync(
@@ -120,7 +115,7 @@ public static class TaskManager
         bool catchException = true,
         bool shouldLog = true)
     {
-        LoggerHelper.Info($"MFA异步任务 {name} 开始.");
+        LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}开始（异步）。");
         try
         {
             await Task.Run(() =>
@@ -133,7 +128,7 @@ public static class TaskManager
         {
             var baseEx = ex.GetBaseException();
             handleError?.Invoke(baseEx);
-            if (shouldLog) LoggerHelper.Error(ex.GetBaseException());
+            if (shouldLog) LoggerHelper.Error($"{FormatTaskPrefix(prompt, name)}执行失败：{baseEx.Message}", baseEx);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -141,7 +136,7 @@ public static class TaskManager
         }
         finally
         {
-            LoggerHelper.Info($"{prompt}MFA异步任务 {name} 已完成.");
+            LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}完成（异步）。");
         }
     }
 
@@ -150,12 +145,13 @@ public static class TaskManager
         CancellationToken token,
         Action<Exception>? handleError = null,
         string name = nameof(Action),
+        string prompt = ">>> ",
         bool catchException = true,
         bool shouldLog = true,
         bool noMessage = false)
     {
         if (!noMessage)
-            LoggerHelper.Info($"MFA异步任务 {name} 开始.");
+            LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}开始（异步）。");
         try
         {
             return await Task.Run(() =>
@@ -168,7 +164,7 @@ public static class TaskManager
         {
             var baseEx = ex.GetBaseException();
             handleError?.Invoke(baseEx);
-            if (shouldLog) LoggerHelper.Error(baseEx);
+            if (shouldLog) LoggerHelper.Error($"{FormatTaskPrefix(prompt, name)}执行失败：{baseEx.Message}", baseEx);
             return default!;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -178,7 +174,7 @@ public static class TaskManager
         finally
         {
             if (!noMessage)
-                LoggerHelper.Info($">>> MFA异步任务 {name} 已完成.");
+                LoggerHelper.Info($"{FormatTaskPrefix(prompt, name)}完成（异步）。");
         }
     }
 }

@@ -89,12 +89,12 @@ public class DeviceDisplayConverter : MarkupExtension, IValueConverter
         }
         catch (JsonReaderException ex)
         {
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"解析设备配置 JSON 失败：原因={ex.Message}", ex);
             return -1;
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"读取模拟器索引失败：原因={ex.Message}", ex);
             return -1;
         }
     }

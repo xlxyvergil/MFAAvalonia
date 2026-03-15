@@ -82,7 +82,7 @@ public partial class ScreenshotViewModel : ViewModelBase
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"执行截图流程失败：原因={e.Message}", e);
         }
     }
 

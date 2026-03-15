@@ -32,7 +32,7 @@ public partial class VersionUpdateSettingsUserControlModel : ViewModelBase
         catch (Exception e)
         {
             MaaFwVersion = "v5.0.0";
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"读取 MaaFramework 版本失败，已回退默认值：原因={e.Message}", e);
         }
         LanguageHelper.LanguageChanged += (_, _) => UpdateCdkExpireDisplay();
         StopCountdownTimer();

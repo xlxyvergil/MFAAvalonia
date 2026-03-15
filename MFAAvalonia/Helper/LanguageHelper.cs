@@ -62,7 +62,7 @@ public static class LanguageHelper
     public static string CurrentLanguage => _currentLanguage;
     public static void Initialize()
     {
-        LoggerHelper.Info("Initializing LanguageManager...");
+        LoggerHelper.Info("开始初始化语言管理器。");
         var plugin = new MFAResxLangPlugin();
         var defaultCulture = CultureInfo.CurrentUICulture;
         I18nManager.Instance.Register(
@@ -124,7 +124,7 @@ public static class LanguageHelper
 
                 if (string.IsNullOrEmpty(processedPath) || !File.Exists(processedPath))
                 {
-                    LoggerHelper.Warning($"语言文件不存在: {processedPath}");
+                    LoggerHelper.Warning($"语言文件不存在：文件={processedPath}");
                     continue;
                 }
 
@@ -149,12 +149,12 @@ public static class LanguageHelper
                         Langs[normalizedLangCode] = langResources;
                     }
 
-                    LoggerHelper.Info($"已加载语言文件: {langCode} -> {processedPath}");
+                    LoggerHelper.Info($"已加载语言文件：语言={langCode}，文件={processedPath}");
                 }
             }
             catch (Exception ex)
             {
-                LoggerHelper.Error($"加载语言文件失败 [{langCode}]: {ex.Message}");
+                LoggerHelper.Error($"加载语言文件失败：语言={langCode}，原因={ex.Message}", ex);
             }
         }
         

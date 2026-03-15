@@ -66,6 +66,59 @@ public partial class TaskQueueViewModel : ViewModelBase
         Initialize();
     }
 
+    private string InstanceName => MaaProcessorManager.Instance.GetInstanceName(Processor.InstanceId);
+
+    private IDisposable BeginUiLogScope(string operation)
+    {
+        return LoggerHelper.PushContext(
+            source: "UI",
+            operation: operation,
+            instanceId: Processor.InstanceId,
+            instanceName: InstanceName);
+    }
+
+    private void LogUiStateChange(string operation, string message)
+    {
+        using var _ = BeginUiLogScope(operation);
+        LoggerHelper.Info(message);
+    }
+
+    private void LogStartBlocked(string reason)
+    {
+        LoggerHelper.Warning($"操作被拒绝：{reason} | {DescribeCurrentSelection()}");
+    }
+
+    private static string DescribeAdbDeviceInfo(AdbDeviceInfo info)
+    {
+        var configLength = string.IsNullOrWhiteSpace(info.Config) ? 0 : info.Config.Length;
+        return $"name={info.Name}, serial={info.AdbSerial}, configLength={configLength}";
+    }
+
+    private string DescribeCurrentSelection()
+    {
+        var controller = CurrentController.ToString();
+        var resource = string.IsNullOrWhiteSpace(CurrentResource) ? "<none>" : CurrentResource;
+        var device = CurrentDevice switch
+        {
+            AdbDeviceInfo adb => $"{adb.Name} ({adb.AdbSerial})",
+            DesktopWindowInfo win => $"{win.Name} (0x{win.Handle.ToInt64():X})",
+            null => "<none>",
+            _ => CurrentDevice.ToString() ?? "<unknown>"
+        };
+
+        return $"controller={controller}, resource={resource}, device={device}";
+    }
+
+    private string DescribeSelectedTasks()
+    {
+        var selectedTasks = TaskItemViewModels
+            .Where(task => !task.IsResourceOptionItem && (task.IsChecked || task.IsCheckedWithNull == null))
+            .Select(task => task.InterfaceItem?.Name ?? task.InterfaceItem?.Entry ?? "<unnamed>")
+            .ToList();
+
+        return $"selectedTasks={selectedTasks.Count} [{string.Join(", ", selectedTasks)}]";
+    }
+
     private void OnTaskQueueCountChanged(object? sender, ObservableQueue<MFATask>.CountChangedEventArgs e)
     {
         DispatcherHelper.RunOnMainThread(() =>
@@ -151,7 +204,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         {
             if (MaaProcessor.Interface == null)
             {
-                LoggerHelper.Warning("MaaProcessor.Interface is not initialized yet.");
+                LoggerHelper.Warning("界面资源接口尚未初始化完成。");
                 CurrentResources = [];
                 return;
             }
@@ -192,7 +245,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"UpdateResourcesForController failed: {ex}");
+            LoggerHelper.Error($"按控制器刷新资源列表失败：原因={ex.Message}", ex);
         }
     }
 
@@ -247,7 +300,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"初始化控制器选项失败：控制器={CurrentController}，原因={e.Message}", e);
             // 出错时使用默认控制器
             var defaultControllers = CreateDefaultControllers();
             ControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(defaultControllers);
@@ -332,7 +385,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"同步控制器与资源状态失败：控制器={CurrentController}，资源={CurrentResource}，原因={e.Message}", e);
             _isSyncing = false;
         }
     }
@@ -369,6 +422,10 @@ public partial class TaskQueueViewModel : ViewModelBase
 
     public void StartTask()
     {
+        using var _ = BeginUiLogScope("StartTask");
+        LoggerHelper.UserAction("启动任务", $"{DescribeCurrentSelection()}, {DescribeSelectedTasks()}",
+            operation: "StartTask", instanceId: Processor.InstanceId, instanceName: InstanceName);
+
         if (IsRunning)
         {
             ToastHelper.Warn(LangKeys.ConfirmExitTitle.ToLocalization());
@@ -379,7 +436,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         if (CurrentResources.Count == 0 || string.IsNullOrWhiteSpace(CurrentResource) || CurrentResources.All(r => r.Name != CurrentResource))
         {
             ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.ResourceNotSelected.ToLocalization());
-            LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+            LogStartBlocked("启动任务被拒绝：未选择有效资源");
             return;
         }
 
@@ -392,7 +449,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             if (CurrentController != MaaControllerTypes.PlayCover && CurrentDevice == null)
             {
                 ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.DeviceNotSelected.ToLocalization());
-                LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+                LogStartBlocked("启动任务被拒绝：未选择连接目标");
                 return;
             }
 
@@ -401,7 +458,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                 && string.IsNullOrWhiteSpace(adbInfo.AdbSerial))
             {
                 ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.AdbAddressEmpty.ToLocalization());
-                LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+                LogStartBlocked("启动任务被拒绝：ADB 序列号为空");
                 return;
             }
         }
@@ -410,7 +467,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             && string.IsNullOrWhiteSpace(Processor.Config.PlayCover.PlayCoverAddress))
         {
             ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.PlayCoverAddressEmpty.ToLocalization());
-            LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+            LogStartBlocked("启动任务被拒绝：PlayCover 地址为空");
             return;
         }
 
@@ -483,20 +540,29 @@ public partial class TaskQueueViewModel : ViewModelBase
     [RelayCommand]
     private void SelectAll()
     {
+        using var _ = BeginUiLogScope("SelectAllTasks");
         foreach (var task in TaskItemViewModels)
             task.IsChecked = true;
+        LoggerHelper.UserAction("全选任务", $"taskCount={TaskItemViewModels.Count}",
+            operation: "SelectAllTasks", instanceId: Processor.InstanceId, instanceName: InstanceName);
     }
 
     [RelayCommand]
     private void SelectNone()
     {
+        using var _ = BeginUiLogScope("SelectNoneTasks");
         foreach (var task in TaskItemViewModels)
             task.IsChecked = false;
+        LoggerHelper.UserAction("取消全选任务", $"taskCount={TaskItemViewModels.Count}",
+            operation: "SelectNoneTasks", instanceId: Processor.InstanceId, instanceName: InstanceName);
     }
 
     [RelayCommand]
     private void AddTask()
     {
+        using var _ = BeginUiLogScope("OpenAddTaskDialog");
+        LoggerHelper.UserAction("打开添加任务对话框", DescribeCurrentSelection(),
+            operation: "OpenAddTaskDialog", instanceId: Processor.InstanceId, instanceName: InstanceName);
         Instances.DialogManager.CreateDialog().WithTitle(LangKeys.AdbEditor.ToLocalization()).WithViewModel(dialog => new AddTaskDialogViewModel(dialog, Processor.TasksSource)).TryShow();
     }
 
@@ -525,6 +591,12 @@ public partial class TaskQueueViewModel : ViewModelBase
     private void ApplyPreset(MaaInterface.MaaInterfacePreset preset)
     {
         if (preset?.Task == null) return;
+        using var _ = BeginUiLogScope("ApplyPreset");
+        LoggerHelper.UserAction("应用预设",
+            $"preset={preset.DisplayName ?? preset.Name}, taskCount={preset.Task.Count}",
+            operation: "ApplyPreset",
+            instanceId: Processor.InstanceId,
+            instanceName: InstanceName);
 
         // 1. 根据预设中的任务列表重建任务顺序与数量：
         //    - 只保留预设中出现的任务（例如：默认 ABCD，预设只有 AB，则应用后只显示 AB 两个任务）
@@ -805,6 +877,7 @@ public partial class TaskQueueViewModel : ViewModelBase
     [RelayCommand]
     private void ResetTasks()
     {
+        using var _ = BeginUiLogScope("ResetTasks");
         // 保留特殊任务（倒计时、系统通知等用户手动添加的自定义 Action 任务）
         var specialTasks = TaskItemViewModels
             .Where(t => !string.IsNullOrWhiteSpace(t.InterfaceItem?.Entry)
@@ -832,6 +905,8 @@ public partial class TaskQueueViewModel : ViewModelBase
 
         // 保存配置
         Processor.InstanceConfiguration.SetValue(ConfigurationKeys.TaskItems, TaskItemViewModels.ToList().Select(model => model.InterfaceItem));
+        LoggerHelper.UserAction("重置任务列表", $"taskCount={TaskItemViewModels.Count}",
+            operation: "ResetTasks", instanceId: Processor.InstanceId, instanceName: InstanceName);
     }
 
     #endregion
@@ -1008,6 +1083,8 @@ public partial class TaskQueueViewModel : ViewModelBase
             return;
         }
 
+        LogUiStateChange("ChangeDevice", $"当前连接目标变更：{DescribeCurrentSelection()}");
+
         ChangedDevice(value);
 
         // 仅 ComboBox 手动选中设备时，根据"刷新后尝试连接"设置自动连接
@@ -1025,7 +1102,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Warning($"Auto connect after device selection failed: {ex.Message}");
+                    LoggerHelper.Warning($"选中设备后自动连接失败：原因={ex.Message}");
                 }
             }, name: "选中设备后自动连接", catchException: true, shouldLog: true);
         }
@@ -1113,6 +1190,12 @@ public partial class TaskQueueViewModel : ViewModelBase
     partial void OnCurrentControllerChanged(MaaControllerTypes value)
     {
         if (_isSyncing) return;
+        using var _ = BeginUiLogScope("ChangeController");
+        LoggerHelper.UserAction("切换控制器",
+            $"controller={value}, resource={CurrentResource}",
+            operation: "ChangeController",
+            instanceId: Processor.InstanceId,
+            instanceName: InstanceName);
         Processor.InstanceConfiguration.SetValue(ConfigurationKeys.CurrentController, value.ToString());
         if (Instances.IsResolved<ConnectSettingsUserControlModel>())
             Instances.ConnectSettingsUserControlModel.CurrentControllerType = value;
@@ -1145,6 +1228,9 @@ public partial class TaskQueueViewModel : ViewModelBase
     [RelayCommand]
     private void CustomAdb()
     {
+        using var _ = BeginUiLogScope("OpenAdbEditor");
+        LoggerHelper.UserAction("打开 ADB 编辑器", DescribeCurrentSelection(),
+            operation: "OpenAdbEditor", instanceId: Processor.InstanceId, instanceName: InstanceName);
         var deviceInfo = CurrentDevice as AdbDeviceInfo;
 
         Instances.DialogManager.CreateDialog().WithTitle(LangKeys.AdbEditor.ToLocalization()).WithViewModel(dialog => new AdbEditorDialogViewModel(deviceInfo, dialog)).Dismiss().ByClickingBackground().TryShow();
@@ -1153,6 +1239,9 @@ public partial class TaskQueueViewModel : ViewModelBase
     [RelayCommand]
     private void EditPlayCover()
     {
+        using var _ = BeginUiLogScope("OpenPlayCoverEditor");
+        LoggerHelper.UserAction("打开 PlayCover 编辑器", DescribeCurrentSelection(),
+            operation: "OpenPlayCoverEditor", instanceId: Processor.InstanceId, instanceName: InstanceName);
         Instances.DialogManager.CreateDialog().WithTitle(LangKeys.PlayCoverEditor.ToLocalization())
             .WithViewModel(dialog => new PlayCoverEditorDialogViewModel(Processor.Config.PlayCover, dialog))
             .Dismiss().ByClickingBackground().TryShow();
@@ -1163,22 +1252,25 @@ public partial class TaskQueueViewModel : ViewModelBase
     [RelayCommand]
     private async Task Reconnect()
     {
+        using var _ = BeginUiLogScope("Reconnect");
+        LoggerHelper.UserAction("重新连接", DescribeCurrentSelection(),
+            operation: "Reconnect", instanceId: Processor.InstanceId, instanceName: InstanceName);
         if (CurrentResources.Count == 0 || string.IsNullOrWhiteSpace(CurrentResource) || CurrentResources.All(r => r.Name != CurrentResource))
         {
             ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.ResourceNotSelected.ToLocalization());
-            LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+            LogStartBlocked("重新连接被拒绝：未选择有效资源");
             return;
         }
 
         if (await RefreshConnectionTargetIfNeededAsync())
         {
-            LoggerHelper.Info("Reconnect: connection target was empty, refreshed device list before connecting.");
+            LoggerHelper.Info("重新连接前发现连接目标为空，已先刷新设备列表。");
         }
 
         if (CurrentController != MaaControllerTypes.PlayCover && CurrentDevice == null)
         {
             ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.DeviceNotSelected.ToLocalization());
-            LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+            LogStartBlocked("重新连接被拒绝：未选择连接目标");
             return;
         }
 
@@ -1187,7 +1279,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             && string.IsNullOrWhiteSpace(adbInfo.AdbSerial))
         {
             ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.AdbAddressEmpty.ToLocalization());
-            LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+            LogStartBlocked("重新连接被拒绝：ADB 序列号为空");
             return;
         }
 
@@ -1195,7 +1287,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             && string.IsNullOrWhiteSpace(Processor.Config.PlayCover.PlayCoverAddress))
         {
             ToastHelper.Warn(LangKeys.CannotStart.ToLocalization(), LangKeys.PlayCoverAddressEmpty.ToLocalization());
-            LoggerHelper.Warning(LangKeys.CannotStart.ToLocalization());
+            LogStartBlocked("重新连接被拒绝：PlayCover 地址为空");
             return;
         }
 
@@ -1207,7 +1299,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Reconnect failed: {ex.Message}");
+            LoggerHelper.Warning($"重新连接失败：原因={ex.Message}");
         }
     }
 
@@ -1245,7 +1337,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Refresh connection target before reconnect failed: {ex.Message}");
+            LoggerHelper.Warning($"重新连接前刷新连接目标失败：{ex.Message}");
         }
 
         return true;
@@ -1254,6 +1346,9 @@ public partial class TaskQueueViewModel : ViewModelBase
     [RelayCommand]
     private void Refresh()
     {
+        using var _ = BeginUiLogScope("RefreshDevices");
+        LoggerHelper.UserAction("刷新连接目标", DescribeCurrentSelection(),
+            operation: "RefreshDevices", instanceId: Processor.InstanceId, instanceName: InstanceName);
         if (Processor.IsConnecting)
         {
             ToastHelper.Info(LangKeys.Tip.ToLocalization(), LangKeys.ConnectingInProgress.ToLocalization());
@@ -1285,7 +1380,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                     catch (OperationCanceledException) { throw; }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Warning($"Auto connect after refresh failed: {ex.Message}");
+                        LoggerHelper.Warning($"刷新后自动连接失败：{ex.Message}");
                     }
                 }
             }, _refreshCancellationTokenSource.Token, name: "刷新", handleError: (e) => HandleDetectionError(e, controllerType),
@@ -1301,14 +1396,20 @@ public partial class TaskQueueViewModel : ViewModelBase
     [RelayCommand]
     private void Clear()
     {
+        using var _ = BeginUiLogScope("ClearLogs");
         // DisposableObservableCollection 会自动调用所有元素的 Dispose()
         Processor.ClearLogs();
+        LoggerHelper.UserAction("清空监控日志", null,
+            operation: "ClearLogs", instanceId: Processor.InstanceId, instanceName: InstanceName);
     }
 
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
     [RelayCommand]
     private async Task Export()
     {
+        using var _ = BeginUiLogScope("ExportLogs");
+        LoggerHelper.UserAction("导出日志", null,
+            operation: "ExportLogs", instanceId: Processor.InstanceId, instanceName: InstanceName);
         var storageProvider = Instances.RootView?.StorageProvider;
         await FileLogExporter.CompressRecentLogs(storageProvider);
     }
@@ -1365,14 +1466,14 @@ public partial class TaskQueueViewModel : ViewModelBase
     {
         if (CurrentDevice is AdbDeviceInfo info)
         {
-            LoggerHelper.Info($"Current device: {JsonConvert.SerializeObject(info)}");
+            LogUiStateChange("MatchAdbDevice", $"当前设备指纹：{DescribeAdbDeviceInfo(info)}");
 
             // 使用指纹匹配设备
             var matchedDevices = devices
                 .Where(device => device.MatchesFingerprint(info))
                 .ToList();
 
-            LoggerHelper.Info($"Found {matchedDevices.Count} devices matching fingerprint");
+            LoggerHelper.Info($"按指纹匹配到的设备数量：{matchedDevices.Count}");
 
             // 多匹配时排序：先比AdbSerial前缀（冒号前），再比设备名称
             if (matchedDevices.Any())
@@ -1420,7 +1521,7 @@ public partial class TaskQueueViewModel : ViewModelBase
     {
         port = -1;
         var parts = adbSerial.Split(':', 2); // 分割为IP和端口（最多分割1次）
-        LoggerHelper.Info(JsonConvert.SerializeObject(parts));
+        LoggerHelper.Info($"解析 ADB 序列号：raw={adbSerial}, segmentCount={parts.Length}");
         return parts.Length == 2 && int.TryParse(parts[1], out port);
     }
 
@@ -1727,7 +1828,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             targetKey.ToLocalization(),
             ex.Message));
 
-        LoggerHelper.Error(ex);
+        LoggerHelper.Error($"读取{targetKey.ToLocalization()}配置失败：{ex.Message}", ex);
     }
 
     public void TryReadAdbDeviceFromConfig(bool inTask = true, bool refresh = false, bool allowAutoDetect = true)
@@ -1799,8 +1900,8 @@ public partial class TaskQueueViewModel : ViewModelBase
         {
             // 使用指纹匹配设备，而不是直接使用保存的设备信息
             // 因为雷电模拟器等的AdbSerial每次启动都会变化
-            LoggerHelper.Info("Reading saved ADB device from configuration, using fingerprint matching.");
-            LoggerHelper.Info($"Saved device fingerprint: {savedDevice1.GenerateDeviceFingerprint()}");
+            LoggerHelper.Info("正在从配置中读取已保存的 ADB 设备，并启用指纹匹配。");
+            LoggerHelper.Info($"已保存设备的指纹：{savedDevice1.GenerateDeviceFingerprint()}");
 
             // 搜索当前可用的设备
             var currentDevices = MaaProcessor.Toolkit.AdbDevice.Find();
@@ -1812,7 +1913,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                 if (device.MatchesFingerprint(savedDevice1))
                 {
                     matchedDevice = device;
-                    LoggerHelper.Info($"Found matching device by fingerprint: {device.Name} ({device.AdbSerial})");
+                    LoggerHelper.Info($"已通过指纹匹配到设备：名称={device.Name}，ADB 序列号={device.AdbSerial}");
                     break;
                 }
             }
@@ -1838,7 +1939,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             else
             {
                 // 没有找到匹配的设备，执行自动检测
-                LoggerHelper.Info("No matching device found by fingerprint, performing auto detection.");
+                LoggerHelper.Info("未通过指纹匹配到设备，开始自动检测。");
                 _refreshCancellationTokenSource?.Cancel();
                 _refreshCancellationTokenSource = new CancellationTokenSource();
                 if (inTask)
@@ -1850,7 +1951,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         else
         {
             // 不使用指纹匹配，直接使用保存的设备信息
-            LoggerHelper.Info("Reading saved ADB device from configuration, fingerprint matching disabled.");
+            LoggerHelper.Info("正在从配置中读取已保存的 ADB 设备，当前未启用指纹匹配。");
             DispatcherHelper.RunOnMainThread(() =>
             {
                 _suppressAutoConnect = true;
@@ -1893,6 +1994,7 @@ public partial class TaskQueueViewModel : ViewModelBase
 
             SetNewProperty(ref _currentResource, value);
             HandlePropertyChanged(ConfigurationKeys.Resource, value);
+            LogUiStateChange("ChangeResource", $"当前资源变更：resource={value}, controller={CurrentController}");
 
             if (!string.IsNullOrWhiteSpace(value))
             {
@@ -2334,7 +2436,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                         var reason = controllerType == MaaControllerTypes.Adb
                             ? LangKeys.LiveViewNoImageReasonAdb.ToLocalization()
                             : LangKeys.LiveViewNoImageReasonWindow.ToLocalization();
-                        LoggerHelper.Warning($"[LiveView] 已连接但获取画面为空 (截图方式: {screencapType}, 控制器: {controllerType}). {reason}");
+                        LoggerHelper.Warning($"实时画面为空：截图方式={screencapType}，控制器={controllerType}，原因={reason}");
                         AddLog($"warn: {LangKeys.LiveViewNoImageWarning.ToLocalizationFormatted(false, screencapType, reason)}", (IBrush?)null);
                     }
                     return;
@@ -2425,6 +2527,7 @@ public partial class TaskQueueViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsLiveViewVisible));
         _liveViewNoImageLogged = false;
+        LoggerHelper.Info(value ? "连接状态变更：已连接。" : "连接状态变更：未连接。");
     }
 
     partial void OnLiveViewImageChanged(Bitmap? value)
@@ -2511,7 +2614,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Warning($"LiveView WriteBgrToBitmap failed: {ex.Message}");
+            LoggerHelper.Warning($"实时画面写入位图失败：{ex.Message}");
                 }
             });
 
@@ -2532,7 +2635,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"LiveView update failed: {ex.Message}");
+            LoggerHelper.Warning($"实时画面更新失败：{ex.Message}");
         }
         finally
         {
@@ -2654,6 +2757,8 @@ public partial class TaskQueueViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(value)
             && !value.Equals(ConfigurationManager.GetCurrentConfiguration(), StringComparison.OrdinalIgnoreCase))
         {
+            LoggerHelper.UserAction("切换配置", $"from={ConfigurationManager.GetCurrentConfiguration()} -> to={value}",
+                operation: "SwitchConfiguration", instanceId: Processor.InstanceId, instanceName: InstanceName);
             ConfigurationManager.SwitchConfiguration(value);
         }
 

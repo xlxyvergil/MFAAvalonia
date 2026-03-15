@@ -31,11 +31,11 @@ public class WebhookAction : IMaaCustomAction
 
             if (string.IsNullOrWhiteSpace(url))
             {
-                LoggerHelper.Warning("[WebhookAction] 未指定URL");
+                LoggerHelper.Warning("执行 Webhook 失败：未配置 URL");
                 return false;
             }
 
-            LoggerHelper.Info($"[WebhookAction] {method} {url}");
+            LoggerHelper.Info($"开始执行 Webhook：method={method}, url={url}, contentType={contentType}, bodyLength={body.Length}");
             using var client = VersionChecker.CreateHttpClientWithProxy();
             client.Timeout = TimeSpan.FromSeconds(30);
 
@@ -50,12 +50,12 @@ public class WebhookAction : IMaaCustomAction
                 response = client.PostAsync(url, content).GetAwaiter().GetResult();
             }
 
-            LoggerHelper.Info($"[WebhookAction] Response: {response.StatusCode}");
+            LoggerHelper.Info($"Webhook 响应：status={(int)response.StatusCode} {response.StatusCode}, success={response.IsSuccessStatusCode}");
             return response.IsSuccessStatusCode;
         }
         catch (Exception e)
         {
-            LoggerHelper.Error($"[WebhookAction] Error: {e.Message}");
+            LoggerHelper.Error($"执行 Webhook 异常：{e.Message}", e);
             return false;
         }
     }

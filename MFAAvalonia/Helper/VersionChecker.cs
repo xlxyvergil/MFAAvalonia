@@ -255,7 +255,7 @@ public static class VersionChecker
                 ToastHelper.Error(LangKeys.CurrentResourcesNotSupportMirror.ToLocalization());
             else
                 ToastHelper.Error(LangKeys.ErrorWhenCheck.ToLocalizationFormatted(true, "Resource"), ex.Message, -1);
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"检查资源更新失败：来源={(isGithub ? "GitHub" : "Mirror")}，原因={ex.Message}", ex);
         }
     }
 
@@ -315,7 +315,7 @@ public static class VersionChecker
             else
                 ToastHelper.Error(LangKeys.ErrorWhenCheck.ToLocalizationFormatted(false, "MFA"), ex.Message);
             Instances.RootViewModel.SetUpdating(false);
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"检查 MFA 更新失败：来源={(isGithub ? "GitHub" : "Mirror")}，原因={ex.Message}", ex);
         }
     }
 
@@ -409,7 +409,7 @@ public static class VersionChecker
             Dismiss(sukiToast);
             ToastHelper.Warn($"{LangKeys.FailToGetLatestVersionInfo.ToLocalization()}", ex.Message, -1);
             Instances.RootViewModel.SetUpdating(false);
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"获取资源包下载信息失败：来源={(isGithub ? "GitHub" : "Mirror")}，本地版本={localVersion}，原因={ex.Message}", ex);
             return;
         }
 
@@ -469,7 +469,7 @@ public static class VersionChecker
         SetStatusText(textBlock, downloadSpeedTextBlock, LangKeys.Downloading.ToLocalization());
         SetProgress(progress, 0);
         (var downloadStatus, tempZipFilePath) = await DownloadWithRetry(downloadUrl, tempZipFilePath, progress, 3, textBlock, downloadSpeedTextBlock);
-        LoggerHelper.Info(tempZipFilePath);
+        LoggerHelper.Info($"已下载更新包到临时文件：文件={tempZipFilePath}");
         if (!downloadStatus)
         {
             Dismiss(sukiToast);
@@ -494,12 +494,12 @@ public static class VersionChecker
         var sha256Verified = true;
         if (string.IsNullOrWhiteSpace(sha256))
         {
-            LoggerHelper.Warning("SHA256 is empty, skipping verification.");
+            LoggerHelper.Warning($"已跳过 SHA256 校验：文件={tempZipFilePath}，原因=未提供校验值");
         }
         else
         {
             sha256Verified = await VerifyFileSha256Async(tempZipFilePath, sha256);
-            LoggerHelper.Info("SHA256 verification result: " + sha256Verified);
+            LoggerHelper.Info($"SHA256 校验结果：文件={tempZipFilePath}，期望值={sha256}，通过={sha256Verified}");
         }
         if (!string.IsNullOrWhiteSpace(sha256) && !sha256Verified)
         {
@@ -523,7 +523,7 @@ public static class VersionChecker
 
         if (ContainsCoreApplicationFiles(tempExtractDir))
         {
-            LoggerHelper.Warning($"资源包包含核心程序文件，继续沿用现有更新流程: {tempExtractDir}");
+            LoggerHelper.Warning($"资源包包含核心程序文件，继续沿用现有更新流程：目录={tempExtractDir}");
         }
 
         var wpfDir = AppPaths.DataRoot;
@@ -531,13 +531,13 @@ public static class VersionChecker
         var agentPath = AppPaths.AgentDirectory;
         // 获取当前运行的可执行文件路径（最可靠的方式，即使用户重命名了文件也能正确获取）
         var exeName = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-        LoggerHelper.Info($"Current process executable: {exeName}");
+        LoggerHelper.Info($"当前进程可执行文件：{exeName}");
         // 如果路径为空或文件不存在，尝试其他方式
         if (string.IsNullOrEmpty(exeName) || !File.Exists(exeName))
         {
             // 尝试使用 Environment.ProcessPath (.NET 6+)
             exeName = Environment.ProcessPath ?? string.Empty;
-            LoggerHelper.Info($"Environment.ProcessPath: {exeName}");
+            LoggerHelper.Info($"已改用 Environment.ProcessPath 获取进程路径：{exeName}");
         }
 
         // 如果仍然为空或不存在，使用 AppContext.BaseDirectory + 当前进程名
@@ -546,12 +546,12 @@ public static class VersionChecker
             var processName = Process.GetCurrentProcess().ProcessName;
             var extension = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : "";
             exeName = Path.Combine(AppContext.BaseDirectory, processName + extension);
-            LoggerHelper.Info($"Fallback to process name: {exeName}");
+            LoggerHelper.Info($"已回退为进程名推断可执行文件路径：{exeName}");
         }
         if (File.Exists(changesPath))
             isFull = false;
         else
-            LoggerHelper.Error("No changes.json found");
+            LoggerHelper.Error($"未找到 changes.json，无法执行增量更新：文件={changesPath}");
         LoggerHelper.Info((isGithub || isFull || currentVersion.Equals("v0.0.0", StringComparison.OrdinalIgnoreCase)) ? "全量更新" : "增量更新");
         if (isGithub || isFull || currentVersion.Equals("v0.0.0", StringComparison.OrdinalIgnoreCase))
         {
@@ -566,12 +566,12 @@ public static class VersionChecker
                     try
                     {
                         File.SetAttributes(rfile, FileAttributes.Normal);
-                        LoggerHelper.Info("Deleting file: " + rfile);
+                        LoggerHelper.Info($"准备删除旧文件：文件={rfile}");
                         DeleteFileWithBackup(rfile);
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Error($"文件删除失败: {rfile}", ex);
+                        LoggerHelper.Error($"删除旧文件失败：文件={rfile}，原因={ex.Message}", ex);
                     }
                 }
             }
@@ -586,12 +586,12 @@ public static class VersionChecker
                     try
                     {
                         File.SetAttributes(rfile, FileAttributes.Normal);
-                        LoggerHelper.Info("Deleting file: " + rfile);
+                        LoggerHelper.Info($"准备删除旧文件：文件={rfile}");
                         DeleteFileWithBackup(rfile);
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Error($"文件删除失败: {rfile}", ex);
+                        LoggerHelper.Error($"删除旧文件失败：文件={rfile}，原因={ex.Message}", ex);
                     }
                 }
             }
@@ -603,7 +603,7 @@ public static class VersionChecker
                 var changes = await File.ReadAllTextAsync(changesPath);
                 if (string.IsNullOrWhiteSpace(changes))
                 {
-                    LoggerHelper.Warning("Empty changes.json found");
+                    LoggerHelper.Warning($"changes.json 为空，无法执行增量更新：文件={changesPath}");
                 }
                 else
                 {
@@ -632,13 +632,13 @@ public static class VersionChecker
                             try
                             {
 
-                                LoggerHelper.Info("Deleting Deleted file: " + delPath);
+                                LoggerHelper.Info($"准备删除增量更新中标记为 Deleted 的文件：文件={delPath}");
                                 DeleteFileWithBackup(delPath);
 
                             }
                             catch (Exception e)
                             {
-                                LoggerHelper.Error("Failed to delete the file: " + e);
+                                LoggerHelper.Error($"删除增量更新中标记为 Deleted 的文件失败：文件={delPath}，原因={e.Message}", e);
                             }
                         }
                     }
@@ -659,12 +659,12 @@ public static class VersionChecker
                         {
                             try
                             {
-                                LoggerHelper.Info("Deleting Modified file: " + delPath);
+                                LoggerHelper.Info($"准备删除增量更新中标记为 Modified 的旧文件：文件={delPath}");
                                 DeleteFileWithBackup(delPath);
                             }
                             catch (Exception e)
                             {
-                                LoggerHelper.Error("Failed to delete the file: " + e);
+                                LoggerHelper.Error($"删除增量更新中标记为 Modified 的旧文件失败：文件={delPath}，原因={e.Message}", e);
                             }
 
                         }
@@ -672,7 +672,7 @@ public static class VersionChecker
                 }
                 catch (Exception e)
                 {
-                    LoggerHelper.Error(e);
+                    LoggerHelper.Error($"处理增量更新文件列表失败：changes.json={changesPath}，原因={e.Message}", e);
                 }
             }
         }
@@ -721,8 +721,8 @@ public static class VersionChecker
     /// <param name="exeName">应用可执行文件路径</param>
     public async static Task RestartApplicationAsync(string exeName)
     {
-        LoggerHelper.Info("Starting application: " + exeName);
-        LoggerHelper.Info("MFA Closed!");
+        LoggerHelper.Info($"准备重新启动应用：可执行文件={exeName}");
+        LoggerHelper.Info("当前 MFA 进程即将退出。");
         LoggerHelper.DisposeLogger();
         if (OperatingSystem.IsMacOS())
         {
@@ -904,7 +904,7 @@ public static class VersionChecker
             string relativePath = Path.GetRelativePath(sourceRootDir, sourceFile);
             if (skipCoreApplicationFiles && IsCoreApplicationFile(relativePath))
             {
-                LoggerHelper.Warning($"Skip copying core application file into resource data directory: {relativePath}");
+                LoggerHelper.Warning($"已跳过复制核心程序文件到资源目录：相对路径={relativePath}");
                 continue;
             }
             string targetFile = Path.Combine(targetDir, fileName);
@@ -950,13 +950,13 @@ public static class VersionChecker
                 catch (IOException ex) when (!cancellationToken.IsCancellationRequested)
                 {
                     // 文件被锁定时，记录警告并重试
-                    LoggerHelper.Warning($"Failed to copy file (may be locked), attempt {i+1}/{maxRetries}: {sourceFile} -> {targetFile}, error: {ex.Message}");
+                    LoggerHelper.Warning($"复制文件失败，准备重试：第 {i + 1}/{maxRetries} 次，源文件={sourceFile}，目标文件={targetFile}，原因={ex.Message}");
                     await Task.Delay(1000, cancellationToken);
                 }
                 catch (UnauthorizedAccessException ex)
                 {
                     // 权限不足时，记录警告并重试
-                    LoggerHelper.Warning($"Access denied when copying file, attempt {i+1}/{maxRetries}: {sourceFile} -> {targetFile}, error: {ex.Message}");
+                    LoggerHelper.Warning($"复制文件被拒绝，准备重试：第 {i + 1}/{maxRetries} 次，源文件={sourceFile}，目标文件={targetFile}，原因={ex.Message}");
                     await Task.Delay(1000, cancellationToken);
                 }
             }
@@ -1033,7 +1033,7 @@ public static class VersionChecker
         }
         catch (Exception e)
         {
-            LoggerHelper.Error($"delete file error, filePath: {filePath}, error: {e.Message}, try to backup.");
+            LoggerHelper.Error($"删除文件失败，准备尝试备份：文件={filePath}，原因={e.Message}");
             int index = 0;
             string currentDate = DateTime.Now.ToString("yyyyMMddHHmm");
             string backupFilePath = $"{filePath}.{currentDate}.{index}.backupMFA";
@@ -1047,12 +1047,12 @@ public static class VersionChecker
             try
             {
                 File.Move(filePath, backupFilePath);
-                LoggerHelper.Info($"File backed up successfully: {filePath} -> {backupFilePath}");
+                LoggerHelper.Info($"文件备份成功：源文件={filePath}，备份文件={backupFilePath}");
             }
             catch (Exception e1)
             {
                 // 文件被锁定时，记录错误但不抛出异常，让更新流程继续
-                LoggerHelper.Warning($"move file error, path: {filePath}, moveTo: {backupFilePath}, error: {e1.Message}. File will be skipped.");
+                LoggerHelper.Warning($"移动文件到备份位置失败，已跳过该文件：源文件={filePath}，目标文件={backupFilePath}，原因={e1.Message}");
             }
         }
     }
@@ -1109,7 +1109,7 @@ public static class VersionChecker
             {
                 Dismiss(sukiToast);
                 ToastHelper.Warn($"{LangKeys.FailToGetLatestVersionInfo.ToLocalization()}", ex.Message);
-                LoggerHelper.Error(ex);
+                LoggerHelper.Error($"获取 MFA 下载信息失败：source={(isGithub ? "GitHub" : "Mirror")}, reason={ex.Message}", ex);
                 Instances.RootViewModel.SetUpdating(false);
                 return;
             }
@@ -1174,12 +1174,12 @@ public static class VersionChecker
             var sha256Verified = true;
             if (string.IsNullOrWhiteSpace(sha256))
             {
-                LoggerHelper.Warning("SHA256 is empty, skipping verification.");
+                LoggerHelper.Warning($"已跳过 SHA256 校验：文件={tempZip}，原因=未提供校验值");
             }
             else
             {
                 sha256Verified = await VerifyFileSha256Async(tempZip, sha256);
-                LoggerHelper.Info("SHA256 verification result: " + sha256Verified);
+                LoggerHelper.Info($"SHA256 校验结果：文件={tempZip}，通过={sha256Verified}");
             }
             if (!string.IsNullOrWhiteSpace(sha256) && !sha256Verified)
             {
@@ -1247,7 +1247,7 @@ public static class VersionChecker
     {
         try
         {
-            LoggerHelper.Info($"Target Updater Path: {filePath}, Exists: {File.Exists(filePath)}");
+            LoggerHelper.Info($"目标更新器路径：文件={filePath}，存在={File.Exists(filePath)}");
             using var process = Process.Start(new ProcessStartInfo
             {
                 WorkingDirectory = AppContext.BaseDirectory,
@@ -1291,7 +1291,7 @@ public static class VersionChecker
             }
             catch (WebException ex) when (i < retries - 1)
             {
-                LoggerHelper.Warning($"下载重试 ({i + 1}/{retries}): {ex.Status}");
+                LoggerHelper.Warning($"下载失败，准备重试：第 {i + 1}/{retries} 次，状态={ex.Status}");
                 await Task.Delay(2000 * (i + 1));
             }
         }
@@ -1334,7 +1334,7 @@ public static class VersionChecker
 
         if (!File.Exists(updaterPath))
         {
-            LoggerHelper.Error($"更新器在目录缺失: {updaterPath}");
+            LoggerHelper.Error($"更新器文件不存在：文件={updaterPath}");
             throw new FileNotFoundException("更新程序源文件未找到");
         }
 
@@ -1345,13 +1345,13 @@ public static class VersionChecker
             // 增强错误处理：检查进程是否启动成功
             if (chmodProcess == null)
             {
-                LoggerHelper.Error("无法启动chmod进程，可能缺少权限");
+                LoggerHelper.Error("无法启动 chmod 进程，可能缺少权限。");
                 throw new InvalidOperationException("设置更新器执行权限失败");
             }
             await chmodProcess.WaitForExitAsync();
             if (chmodProcess.ExitCode != 0)
             {
-                LoggerHelper.Error($"chmod执行失败，退出码: {chmodProcess.ExitCode}");
+                LoggerHelper.Error($"chmod 执行失败：退出码={chmodProcess.ExitCode}");
                 throw new InvalidOperationException("设置更新器执行权限失败");
             }
         }
@@ -1362,7 +1362,7 @@ public static class VersionChecker
         // 构建命令参数
         var arguments = $"{BuildArguments(source, target, oldName, newName)} {EscapeArgument(currentProcessId.ToString())}";
 
-        LoggerHelper.Info($"准备启动更新器: {updaterPath} {arguments}");
+        LoggerHelper.Info($"准备启动更新器：文件={updaterPath}，参数={arguments}");
 
         try
         {
@@ -1380,12 +1380,12 @@ public static class VersionChecker
                     RedirectStandardError = false
                 };
 
-                LoggerHelper.Info($"/bin/sh \"cd '{AppContext.BaseDirectory}' && nohup '{updaterPath}' {arguments} > /dev/null 2>&1 &\"");
+                LoggerHelper.Info($"macOS shell 启动命令：/bin/sh \"cd '{AppContext.BaseDirectory}' && nohup '{updaterPath}' {arguments} > /dev/null 2>&1 &\"");
 
                 using var shellProcess = Process.Start(psi);
                 if (shellProcess?.HasExited == false)
                 {
-                    LoggerHelper.Info($"更新器已通过macOS shell启动(nohup)(PID:{shellProcess.Id})");
+                    LoggerHelper.Info($"更新器已通过 macOS shell 启动：方式=nohup，进程ID={shellProcess.Id}");
                 }
             }
             else
@@ -1401,18 +1401,18 @@ public static class VersionChecker
                     WindowStyle = ProcessWindowStyle.Hidden
                 };
 
-                LoggerHelper.Info($"{Path.Combine(AppContext.BaseDirectory, updaterName)} {BuildArguments(source, target, oldName, newName)} {EscapeArgument(currentProcessId.ToString())}");
+                LoggerHelper.Info($"更新器启动命令：{Path.Combine(AppContext.BaseDirectory, updaterName)} {BuildArguments(source, target, oldName, newName)} {EscapeArgument(currentProcessId.ToString())}");
 
                 using var updaterProcess = Process.Start(psi);
                 if (updaterProcess?.HasExited == false)
                 {
-                    LoggerHelper.Info($"更新器已启动(PID:{updaterProcess.Id})");
+                    LoggerHelper.Info($"更新器已启动：进程ID={updaterProcess.Id}");
                 }
             }
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"启动失败: {ex.Message}");
+            LoggerHelper.Error($"启动更新器失败：原因={ex.Message}", ex);
             throw;
         }
         finally
@@ -1510,7 +1510,7 @@ public static class VersionChecker
             {
                 Dismiss(sukiToast);
                 ToastHelper.Warn($"{LangKeys.FailToGetLatestVersionInfo.ToLocalization()}", ex.Message, -1);
-                LoggerHelper.Error(ex);
+                LoggerHelper.Error($"获取资源更新地址失败：来源=Mirror，资源ID={resId}，当前版本={currentVersion}，原因={ex.Message}", ex);
                 Instances.RootViewModel.SetUpdating(false);
                 return;
             }
@@ -1570,9 +1570,9 @@ public static class VersionChecker
             while (Queue.TryDequeue(out var task))
             {
                 await _queueLock.WaitAsync();
-                LoggerHelper.Info($"开始执行任务: {task.Name}");
+                LoggerHelper.Info($"开始执行更新任务：名称={task.Name}");
                 await task.Action();
-                LoggerHelper.Info($"任务完成: {task.Name}");
+                LoggerHelper.Info($"更新任务完成：名称={task.Name}");
                 _queueLock.Release();
             }
         }
@@ -1686,19 +1686,19 @@ public static class VersionChecker
                 }
                 else if (response.StatusCode == HttpStatusCode.Forbidden && response.ReasonPhrase?.Contains("403") == true)
                 {
-                    LoggerHelper.Error("GitHub API速率限制已超出，请稍后再试。");
+                    LoggerHelper.Error("GitHub API 速率限制已超出，请稍后再试。");
                     throw new Exception("GitHub API速率限制已超出，请稍后再试。");
                 }
                 else
                 {
-                    LoggerHelper.Error($"请求GitHub时发生错误: {response.StatusCode} - {response.ReasonPhrase}");
-                    throw new Exception($"请求GitHub时发生错误: {response.StatusCode} - {response.ReasonPhrase}");
+                    LoggerHelper.Error($"请求 GitHub 失败：状态码={(int)response.StatusCode} {response.StatusCode}，原因={response.ReasonPhrase}");
+                    throw new Exception($"请求 GitHub 失败：状态码={(int)response.StatusCode} {response.StatusCode}，原因={response.ReasonPhrase}");
                 }
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                LoggerHelper.Error($"处理GitHub响应时发生错误: {e.Message}");
-                throw new Exception($"处理GitHub响应时发生错误: {e.Message}");
+                LoggerHelper.Error($"处理 GitHub 响应失败：原因={e.Message}", e);
+                throw new Exception($"处理 GitHub 响应失败：原因={e.Message}");
             }
             page++;
         }
@@ -1913,7 +1913,7 @@ public static class VersionChecker
         // 获取系统信息（具体系统 + 家族）
         var (osPlatform, osFamily) = GetNormalizedOSInfo();
         var cpuArch = GetNormalizedArchitecture();
-        LoggerHelper.Info($"目标系统: {osPlatform}（家族: {osFamily}），架构: {cpuArch}");
+        LoggerHelper.Info($"目标系统：平台={osPlatform}，系统家族={osFamily}，架构={cpuArch}");
 
         var releaseUrl = $"https://api.github.com/repos/{owner}/{repo}/releases/tags/{version}";
         using var httpClient = CreateHttpClientWithProxy();
@@ -1952,7 +1952,7 @@ public static class VersionChecker
                     foreach (var asset in orderedAssets)
                     {
                         int priority = GetAssetPriority(asset.Name, osPlatform, osFamily, cpuArch);
-                        LoggerHelper.Info($"资产 {asset.Name} 优先级: {priority}");
+                        LoggerHelper.Info($"候选资产优先级：名称={asset.Name}，优先级={priority}");
                     }
 
                     var bestAsset = orderedAssets.FirstOrDefault(a => a.Url != null);
@@ -1962,13 +1962,13 @@ public static class VersionChecker
             }
             else
             {
-                LoggerHelper.Error($"请求GitHub时发生错误: {response.StatusCode} - {response.ReasonPhrase}");
+                LoggerHelper.Error($"请求 GitHub 失败：状态码={(int)response.StatusCode} {response.StatusCode}，原因={response.ReasonPhrase}");
                 throw new Exception($"{response.StatusCode} - {response.ReasonPhrase}");
             }
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            LoggerHelper.Error($"处理GitHub响应时发生错误: {e.Message}");
+            LoggerHelper.Error($"处理 GitHub 响应失败：原因={e.Message}", e);
             throw;
         }
         return (downloadUrl, sha256);
@@ -2028,7 +2028,7 @@ public static class VersionChecker
             var jsonResponse = response.Content.ReadAsStringAsync().Result;
             var responseData = JObject.Parse(jsonResponse);
             if (!onlyCheck)
-                LoggerHelper.Info(jsonResponse);
+                LoggerHelper.Info($"镜像接口原始响应摘要：长度={jsonResponse.Length}");
             Exception? exception = null;
             // 处理 HTTP 状态码
             if (!response.IsSuccessStatusCode)
@@ -2057,14 +2057,14 @@ public static class VersionChecker
             if (data["cdk_expired_time"] != null && long.TryParse(data["cdk_expired_time"]?.ToString(), out var cdkExpiredTime))
             {
                 Instances.VersionUpdateSettingsUserControlModel.CdkExpiredTime = cdkExpiredTime;
-                LoggerHelper.Info($"CDK 过期时间戳: {cdkExpiredTime}");
+                LoggerHelper.Info($"CDK 过期时间戳：{cdkExpiredTime}");
             }
 
             if (showResponse)
             {
                 // 记录从 mirror 返回的关键信息
-                LoggerHelper.Info($"Mirror返回信息: {jsonResponse}");
-                LoggerHelper.Info($"更新类型: {updateType}, 是否全量更新: {isFull}");
+                LoggerHelper.Info($"镜像返回信息摘要：长度={jsonResponse.Length}");
+                LoggerHelper.Info($"更新类型：类型={updateType}，是否全量更新={isFull}");
             }
 
             if (IsNewVersionAvailable(latestVersion, currentVersion) && saveAnnouncement)
@@ -2195,7 +2195,7 @@ public static class VersionChecker
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"比较版本号失败：latest={latestVersion}, local={localVersion}, reason={ex.Message}", ex);
             return false;
         }
     }
@@ -2324,17 +2324,17 @@ public static class VersionChecker
         }
         catch (HttpRequestException httpEx)
         {
-            LoggerHelper.Error($"HTTP请求失败: {httpEx.Message}");
+            LoggerHelper.Error($"HTTP 请求失败：原因={httpEx.Message}", httpEx);
             return (false, targetFilePath);
         }
         catch (IOException ioEx)
         {
-            LoggerHelper.Error($"文件操作失败: {ioEx.Message}");
+            LoggerHelper.Error($"文件操作失败：原因={ioEx.Message}", ioEx);
             return (false, targetFilePath);
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"未知错误: {ex.Message}");
+            LoggerHelper.Error($"下载文件时发生未知错误：原因={ex.Message}", ex);
             return (false, targetFilePath);
         }
     }
@@ -2358,7 +2358,7 @@ public static class VersionChecker
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"SHA256校验失败: {ex.Message}");
+            LoggerHelper.Error($"SHA256 校验失败：原因={ex.Message}", ex);
             return false;
         }
     }
@@ -2595,7 +2595,7 @@ public static class VersionChecker
         }
         catch (Exception e)
         {
-            LoggerHelper.Warning(e);
+            LoggerHelper.Warning($"关闭更新提示 Toast 失败：原因={e.Message}");
         }
     }
 
@@ -2632,12 +2632,12 @@ public static class VersionChecker
                 Directory.CreateDirectory(resourceDirectory);
                 var filePath = Path.Combine(resourceDirectory, ChangelogViewModel.ReleaseFileName);
                 File.WriteAllText(filePath, bodyContent);
-                LoggerHelper.Info($"{ChangelogViewModel.ReleaseFileName} saved successfully.");
+                LoggerHelper.Info($"已保存发布说明文件：文件={filePath}，长度={bodyContent.Length}");
             }
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Error saving {ChangelogViewModel.ReleaseFileName}: {ex.Message}");
+            LoggerHelper.Error($"保存发布说明文件失败：文件={ChangelogViewModel.ReleaseFileName}，原因={ex.Message}", ex);
         }
     }
 
@@ -2652,13 +2652,13 @@ public static class VersionChecker
                 Directory.CreateDirectory(resourceDirectory);
                 var filePath = Path.Combine(resourceDirectory, ChangelogViewModel.ChangelogFileName);
                 File.WriteAllText(filePath, bodyContent);
-                LoggerHelper.Info($"{ChangelogViewModel.ChangelogFileName} saved successfully.");
+                LoggerHelper.Info($"已保存更新日志文件：文件={filePath}，长度={bodyContent.Length}");
                 GlobalConfiguration.SetValue(ConfigurationKeys.DoNotShowChangelogAgain, bool.FalseString);
             }
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Error saving {ChangelogViewModel.ChangelogFileName}: {ex.Message}");
+            LoggerHelper.Error($"保存更新日志文件失败：文件={ChangelogViewModel.ChangelogFileName}，原因={ex.Message}", ex);
         }
     }
 
@@ -2684,14 +2684,14 @@ public static class VersionChecker
                 // 只在有错误时记录详细信息，避免日志冗余
                 if (errors != SslPolicyErrors.None)
                 {
-                    LoggerHelper.Warning($"证书验证警告: {cert?.Subject ?? "null"}");
-                    LoggerHelper.Warning($"证书错误类型: {errors}");
+                    LoggerHelper.Warning($"证书验证警告：证书主题={cert?.Subject ?? "null"}");
+                    LoggerHelper.Warning($"证书错误类型：{errors}");
 
                     if (chain != null)
                     {
                         foreach (var status in chain.ChainStatus)
                         {
-                            LoggerHelper.Warning($"证书链状态: {status.Status}, {status.StatusInformation}");
+                            LoggerHelper.Warning($"证书链状态：状态={status.Status}，信息={status.StatusInformation}");
                         }
                     }
                 }
@@ -2771,7 +2771,7 @@ public static class VersionChecker
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"代理初始化失败: {ex.Message}");
+            LoggerHelper.Error($"初始化网络代理失败：原因={ex.Message}", ex);
             return new HttpClient(handler)
             {
                 Timeout = TimeSpan.FromSeconds(60),
@@ -2798,7 +2798,7 @@ public static class VersionChecker
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"解析URL扩展名失败: {ex.Message}");
+            LoggerHelper.Warning($"解析 URL 扩展名失败：原因={ex.Message}");
             return string.Empty;
         }
     }
@@ -2865,7 +2865,7 @@ public static class VersionChecker
                     if (!process.WaitForExit(3000))
                     {
                         try { process.Kill(); } catch { }
-                        LoggerHelper.Warning($"Process timed out for --identify: {exeFile}");
+                        LoggerHelper.Warning($"识别可执行文件超时：模式=--identify，文件={exeFile}，超时毫秒=3000");
                         continue;
                     }
                     outputTask.Wait(1000);
@@ -2873,13 +2873,13 @@ public static class VersionChecker
 
                     if (output.Equals(targetIdentity, StringComparison.OrdinalIgnoreCase))
                     {
-                        LoggerHelper.Info($"Found MFAAvalonia executable via --identify: {exeFile}");
+                        LoggerHelper.Info($"已通过 --identify 识别到 MFAAvalonia 可执行文件：{exeFile}");
                         return exeFile;
                     }
                 }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Warning($"Failed to identify {exeFile}: {ex.Message}");
+                    LoggerHelper.Warning($"识别可执行文件失败：文件={exeFile}，原因={ex.Message}");
                 }
             }
 
@@ -2887,7 +2887,7 @@ public static class VersionChecker
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Error scanning for MFA executable: {ex.Message}");
+            LoggerHelper.Error($"扫描 MFAAvalonia 可执行文件失败：根目录={directory}，原因={ex.Message}", ex);
             return string.Empty;
         }
     }
@@ -2915,7 +2915,7 @@ public static class VersionChecker
                     var exeFile = FindExecutableInSameDirectory(dllDir);
                     if (!string.IsNullOrEmpty(exeFile))
                     {
-                        LoggerHelper.Info($"Found MFA executable via DLL: {exeFile}");
+                        LoggerHelper.Info($"已通过 MFAAvalonia.dll 定位可执行文件：{exeFile}");
                         return exeFile;
                     }
                 }
@@ -2931,7 +2931,7 @@ public static class VersionChecker
                     var exeFile = FindExecutableInSameDirectory(depsDir);
                     if (!string.IsNullOrEmpty(exeFile))
                     {
-                        LoggerHelper.Info($"Found MFA executable via deps.json: {exeFile}");
+                        LoggerHelper.Info($"已通过 MFAAvalonia.deps.json 定位可执行文件：{exeFile}");
                         return exeFile;
                     }
                 }
@@ -2947,18 +2947,18 @@ public static class VersionChecker
                     var exeFile = FindExecutableInSameDirectory(configDir);
                     if (!string.IsNullOrEmpty(exeFile))
                     {
-                        LoggerHelper.Info($"Found MFA executable via runtimeconfig.json: {exeFile}");
+                        LoggerHelper.Info($"已通过 MFAAvalonia.runtimeconfig.json 定位可执行文件：{exeFile}");
                         return exeFile;
                     }
                 }
             }
 
-            LoggerHelper.Warning($"Could not find MFAAvalonia executable in directory: {directory}");
+            LoggerHelper.Warning($"未在目录中找到 MFAAvalonia 可执行文件：目录={directory}");
             return string.Empty;
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Error finding MFA executable: {ex.Message}");
+            LoggerHelper.Error($"查找 MFAAvalonia 可执行文件失败：目录={directory}，原因={ex.Message}", ex);
             return string.Empty;
         }
     }

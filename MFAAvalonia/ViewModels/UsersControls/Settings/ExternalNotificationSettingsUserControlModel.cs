@@ -64,7 +64,7 @@ public partial class ExternalNotificationSettingsUserControlModel : ViewModelBas
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"更新外部通知启用列表失败：原因={e.Message}", e);
         }
     }
 

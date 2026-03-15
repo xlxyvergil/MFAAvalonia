@@ -35,7 +35,7 @@ public static class ScriptRunner
 
         if (!await ExecuteScriptAsync(scriptPath))
         {
-            LoggerHelper.Error($"Failed to execute the {scriptType}.");
+            LoggerHelper.Error($"执行脚本失败：脚本类型={scriptType}，脚本路径={scriptPath}");
         }
     }
 
@@ -90,13 +90,15 @@ public static class ScriptRunner
                     UseShellExecute = !createNoWindow,
                 },
             };
+            LoggerHelper.Info($"开始执行脚本：文件={fileName}，参数={arguments}，无窗口={createNoWindow}，最小化={minimized}");
             process.Start();
             await process.WaitForExitAsync();
+            LoggerHelper.Info($"脚本执行完成：文件={fileName}，退出码={process.ExitCode}");
             return true;
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Script execution failed: {ex.Message}");
+            LoggerHelper.Error($"脚本执行异常：脚本路径={scriptPath}，原因={ex.Message}", ex);
             return false;
         }
     }

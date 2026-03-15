@@ -136,7 +136,7 @@ public partial class MonitorItemViewModel : ViewModelBase
         }
         catch (Exception ex) when (ex.Message == MaaProcessor.ConnectionFailedAfterAllRetriesMessage)
         {
-            LoggerHelper.Warning($"Monitor reconnect failed: {ex.Message}");
+            LoggerHelper.Warning($"监控页重连失败：原因={ex.Message}");
         }
         finally
         {

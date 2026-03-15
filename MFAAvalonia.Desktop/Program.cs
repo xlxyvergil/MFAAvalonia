@@ -86,7 +86,7 @@ sealed class Program
                 }
                 try
                 {
-                    LoggerHelper.Info("MaaFramework runtimes: " + JsonConvert.SerializeObject(resultDirectories, Formatting.Indented));
+                    LoggerHelper.Info($"检测到 MaaFramework 运行时目录：数量={resultDirectories.Count}，路径=[{string.Join(", ", resultDirectories)}]");
                 }
                 catch
                 {
@@ -105,9 +105,9 @@ sealed class Program
 
             try
             {
-                LoggerHelper.Info("Args: " + JsonConvert.SerializeObject(AppRuntime.Args, Formatting.Indented));
-                LoggerHelper.Info("MFA version: " + RootViewModel.Version);
-                LoggerHelper.Info(".NET version: " + RuntimeInformation.FrameworkDescription);
+                LoggerHelper.Info($"启动参数：数量={AppRuntime.Args.Count}，内容=[{string.Join(", ", AppRuntime.Args)}]");
+                LoggerHelper.Info($"程序版本：{RootViewModel.Version}");
+                LoggerHelper.Info($".NET 运行时：{RuntimeInformation.FrameworkDescription}");
             }
             catch
             {
@@ -206,7 +206,7 @@ sealed class Program
         {
             try
             {
-                LoggerHelper.Error("SkiaSharp check failed", e);
+                LoggerHelper.Error($"SkiaSharp 依赖检测失败：{e.Message}", e);
                 if (OperatingSystem.IsWindows())
                 {
                     MessageBox(IntPtr.Zero,

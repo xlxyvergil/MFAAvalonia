@@ -50,6 +50,15 @@ public partial class InstanceTabBarViewModel : ViewModelBase
     public ObservableCollection<RecentClosedInstanceItem> FilteredRecentClosedTabs { get; } = new();
     public ObservableCollection<MaaInterface.MaaInterfacePreset> FilteredInstancePresets { get; } = new();
 
+    private static IDisposable BeginInstanceLogScope(string operation, string? instanceId = null, string? instanceName = null)
+    {
+        return LoggerHelper.PushContext(
+            source: "UI",
+            operation: operation,
+            instanceId: instanceId,
+            instanceName: instanceName);
+    }
+
     partial void OnIsDropdownOpenChanged(bool value)
     {
         if (value)
@@ -171,6 +180,12 @@ public partial class InstanceTabBarViewModel : ViewModelBase
     {
         if (tab != null)
         {
+            LoggerHelper.UserAction(
+                "切换实例页签",
+                $"target={tab.Name} ({tab.InstanceId})",
+                operation: "SelectInstance",
+                instanceId: tab.InstanceId,
+                instanceName: tab.Name);
             ActiveTab = tab;
             IsDropdownOpen = false;
         }
@@ -350,6 +365,10 @@ public partial class InstanceTabBarViewModel : ViewModelBase
     }
     private void SwitchToInstance(MaaProcessor processor)
     {
+        using var _ = BeginInstanceLogScope(
+            "SwitchInstance",
+            processor.InstanceId,
+            MaaProcessorManager.Instance.GetInstanceName(processor.InstanceId));
         // 切换前保存当前实例的任务状态
         var vm = MaaProcessorManager.Instance.Current?.ViewModel;
         if (vm != null)
@@ -361,6 +380,7 @@ public partial class InstanceTabBarViewModel : ViewModelBase
 
         if (MaaProcessorManager.Instance.SwitchCurrent(processor.InstanceId))
         {
+            LoggerHelper.Info("实例切换完成");
             // ReloadConfigurationForSwitch(false) 会刷新实例级配置（ConnectSettings 等），无需重复调用 SyncConnectSettingsForCurrentInstance
             Instances.ReloadConfigurationForSwitch(false);
         }
@@ -462,6 +482,7 @@ public partial class InstanceTabBarViewModel : ViewModelBase
 
     private async Task AddInstanceCoreAsync(MaaInterface.MaaInterfacePreset? preset)
     {
+        using var _ = BeginInstanceLogScope("AddInstance");
         var lastTab = Tabs.LastOrDefault();
 
         // 先将最右侧实例的当前任务列表（含勾选状态）保存到配置
@@ -506,6 +527,15 @@ public partial class InstanceTabBarViewModel : ViewModelBase
             ? MaaProcessorManager.Instance.CreateInstance(newId, false)
             : MaaProcessorManager.Instance.CreateInstance(false);
 
+        LoggerHelper.UserAction(
+            "新增实例",
+            preset == null
+                ? $"new={MaaProcessorManager.Instance.GetInstanceName(processor.InstanceId)} ({processor.InstanceId})"
+                : $"new={MaaProcessorManager.Instance.GetInstanceName(processor.InstanceId)} ({processor.InstanceId}), preset={preset.DisplayName ?? preset.Name}",
+            operation: "AddInstance",
+            instanceId: processor.InstanceId,
+            instanceName: MaaProcessorManager.Instance.GetInstanceName(processor.InstanceId));
+
         await Task.Run(() => processor.InitializeData());
 
         // 如果指定了预设，应用到新实例的 ViewModel，并使用预设的显示名称
@@ -539,10 +569,12 @@ public partial class InstanceTabBarViewModel : ViewModelBase
     private async Task CloseInstance(InstanceTabViewModel? tab)
     {
         if (tab == null) return;
+        using var _ = BeginInstanceLogScope("CloseInstance", tab.InstanceId, tab.Name);
 
         if (Tabs.Count <= 1)
         {
             ToastHelper.Info(LangKeys.InstanceCannotCloseLast.ToLocalization());
+            LoggerHelper.Warning("关闭实例被拒绝，因为这是最后一个实例");
             return;
         }
 
@@ -572,6 +604,12 @@ public partial class InstanceTabBarViewModel : ViewModelBase
 
         if (MaaProcessorManager.Instance.RemoveInstance(tab.InstanceId))
         {
+            LoggerHelper.UserAction(
+                "关闭实例",
+                $"closed={tab.Name} ({tab.InstanceId})",
+                operation: "CloseInstance",
+                instanceId: tab.InstanceId,
+                instanceName: tab.Name);
             RecentClosedTabs.Remove(RecentClosedTabs.FirstOrDefault(item => item.InstanceId == tab.InstanceId));
             RecentClosedTabs.Insert(0, recentClosedItem);
             while (RecentClosedTabs.Count > 12)

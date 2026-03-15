@@ -58,7 +58,7 @@ public partial class MFATask : ObservableObject
         }
         catch (MaaJobStatusException)
         {
-            LoggerHelper.Error($"Task {LanguageHelper.GetLocalizedString(Name)} failed to run");
+            LoggerHelper.Error($"任务执行失败：{LanguageHelper.GetLocalizedString(Name)}");
             return MFATaskStatus.FAILED;
         }
         catch (OperationCanceledException)
@@ -67,7 +67,7 @@ public partial class MFATask : ObservableObject
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"任务执行异常：任务={LanguageHelper.GetLocalizedString(Name)}，原因={ex.Message}", ex);
             return MFATaskStatus.FAILED;
         }
     }

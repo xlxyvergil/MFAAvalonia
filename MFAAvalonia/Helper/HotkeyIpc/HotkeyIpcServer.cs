@@ -53,7 +53,7 @@ public class HotkeyIpcServer : IDisposable
                 _actualPort = port;
                 _isRunning = true;
                 SavePortToFile(port);
-                LoggerHelper.Info($"HotkeyIpcServer: 启动 TCP 服务端，端口 {port}");
+                LoggerHelper.Info($"热键 IPC 服务端已启动：端口={port}");
                 break;
             }
             catch (SocketException)
@@ -65,7 +65,7 @@ public class HotkeyIpcServer : IDisposable
 
         if (!_isRunning)
         {
-            LoggerHelper.Error("HotkeyIpcServer: 无法找到可用端口");
+            LoggerHelper.Error("热键 IPC 服务端启动失败：未找到可用端口。");
             return Task.CompletedTask;
         }
         _ = Task.Run(AcceptClientsAsync);
@@ -77,11 +77,12 @@ public class HotkeyIpcServer : IDisposable
         try
         {
             var portPath = GetPortFilePath();
-            File.WriteAllText(portPath, port.ToString());LoggerHelper.Info($"HotkeyIpcServer: 端口文件已保存到 {portPath}");
+            File.WriteAllText(portPath, port.ToString());
+            LoggerHelper.Info($"热键 IPC 端口文件已保存：文件={portPath}");
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyIpcServer: 保存端口文件失败 - {ex.Message}");
+            LoggerHelper.Warning($"保存热键 IPC 端口文件失败：原因={ex.Message}");
         }
     }
 
@@ -123,7 +124,7 @@ public class HotkeyIpcServer : IDisposable
             catch (ObjectDisposedException) { break; }
             catch (Exception ex)
             {
-                LoggerHelper.Warning($"HotkeyIpcServer: 接受连接失败 - {ex.Message}");
+                LoggerHelper.Warning($"热键 IPC 服务端接受连接失败：原因={ex.Message}");
                 await Task.Delay(100);
             }
         }
@@ -158,7 +159,7 @@ public class HotkeyIpcServer : IDisposable
 
                 if (string.IsNullOrEmpty(line)) break;
 
-                LoggerHelper.Debug($"HotkeyIpcServer: 收到消息 - {line}");
+                LoggerHelper.Debug($"热键 IPC 服务端收到消息：{line}");
                 var msg = HotkeyMessage.Deserialize(line);
                 if (msg == null) continue;
 
@@ -170,7 +171,7 @@ public class HotkeyIpcServer : IDisposable
                         var ack = HotkeyMessage.Create(HotkeyMessageType.ConnectAck);
                         await WriteLineAsync(writer, ack.SerializeToJson());
                         ClientConnected?.Invoke(clientId);
-                        LoggerHelper.Info($"HotkeyIpcServer: 客户端连接 - {clientId}");
+                        LoggerHelper.Info($"热键 IPC 客户端已连接：客户端ID={clientId}");
                         break;
 
                     case HotkeyMessageType.RegisterHotkey when msg.Hotkey != null && clientId != null:
@@ -195,7 +196,7 @@ public class HotkeyIpcServer : IDisposable
         }
         catch (Exception ex)
         {
-            LoggerHelper.Debug($"HotkeyIpcServer: 客户端处理异常 - {ex.Message}");
+            LoggerHelper.Debug($"热键 IPC 客户端处理异常：原因={ex.Message}");
         }
         finally
         {
@@ -233,7 +234,7 @@ public class HotkeyIpcServer : IDisposable
             }
             clients.Add(clientId);
         }
-        LoggerHelper.Info($"HotkeyIpcServer: 注册热键 {hotkey} <- {clientId}");
+        LoggerHelper.Info($"热键 IPC 注册订阅：热键={hotkey}，客户端ID={clientId}");
     }
 
     private void UnregisterHotkey(string clientId, HotkeyIdentifier hotkey)
@@ -277,7 +278,7 @@ public class HotkeyIpcServer : IDisposable
             targetClients = new List<string>(clients);
         }
 
-        LoggerHelper.Info($"HotkeyIpcServer: 广播热键 {hotkey} 给 {targetClients.Count} 个客户端");
+        LoggerHelper.Info($"热键 IPC 广播触发：热键={hotkey}，目标客户端数量={targetClients.Count}");
         var msg = HotkeyMessage.CreateTriggered(hotkey.KeyCode, hotkey.Modifiers);
         var json = msg.SerializeToJson();
         var failedClients = new List<string>();

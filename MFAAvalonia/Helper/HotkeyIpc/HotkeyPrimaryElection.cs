@@ -47,7 +47,7 @@ public class HotkeyPrimaryElection : IDisposable
             if (createdNew)
             {
                 _isPrimary = true;
-                LoggerHelper.Info("HotkeyPrimaryElection: 成为主进程（创建了新的全局互斥锁）");
+                LoggerHelper.Info("热键主进程选举：已成为主进程（创建了新的全局互斥锁）。");
                 BecamePrimary?.Invoke();
                 return true;
             }
@@ -60,7 +60,7 @@ public class HotkeyPrimaryElection : IDisposable
                     if (acquired)
                     {
                         _isPrimary = true;
-                        LoggerHelper.Info("HotkeyPrimaryElection: 成为主进程（获取了现有互斥锁）");
+                        LoggerHelper.Info("热键主进程选举：已成为主进程（获取了现有互斥锁）。");
                         BecamePrimary?.Invoke();
                         return true;
                     }
@@ -69,7 +69,7 @@ public class HotkeyPrimaryElection : IDisposable
                 {
                     // 之前的主进程崩溃，我们获得了互斥锁
                     _isPrimary = true;
-                    LoggerHelper.Warning("HotkeyPrimaryElection: 检测到废弃的互斥锁，接管主进程角色");
+                    LoggerHelper.Warning("热键主进程选举：检测到废弃互斥锁，已接管主进程角色。");
                     BecamePrimary?.Invoke();
                     return true;
                 }
@@ -77,13 +77,13 @@ public class HotkeyPrimaryElection : IDisposable
                 // 无法获取互斥锁，释放资源
                 _primaryMutex.Dispose();
                 _primaryMutex = null;
-                LoggerHelper.Info("HotkeyPrimaryElection: 无法成为主进程，已有其他实例持有互斥锁");
+                LoggerHelper.Info("热键主进程选举：已有其他实例持有互斥锁，当前实例不作为主进程。");
                 return false;
             }
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyPrimaryElection: 尝试成为主进程失败 - {ex.Message}");
+            LoggerHelper.Warning($"热键主进程选举失败：原因={ex.Message}");
             _primaryMutex?.Dispose();
             _primaryMutex = null;
             return false;
@@ -110,7 +110,7 @@ public class HotkeyPrimaryElection : IDisposable
         _primaryMutex = null;
         _isPrimary = false;
         LostPrimary?.Invoke();
-        LoggerHelper.Info("HotkeyPrimaryElection: 释放主进程角色");
+        LoggerHelper.Info("热键主进程选举：已释放主进程角色。");
     }
 
     /// <summary>
@@ -171,7 +171,7 @@ public class HotkeyPrimaryElection : IDisposable
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyPrimaryElection: 保存状态失败 - {ex.Message}");
+            LoggerHelper.Warning($"保存热键状态失败：原因={ex.Message}");
         }
     }
 
@@ -190,7 +190,7 @@ public class HotkeyPrimaryElection : IDisposable
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyPrimaryElection: 加载状态失败 - {ex.Message}");
+            LoggerHelper.Warning($"加载热键状态失败：原因={ex.Message}");
             return null;
         }
     }

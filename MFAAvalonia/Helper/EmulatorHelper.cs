@@ -41,7 +41,7 @@ public static class EmulatorHelper
             else if (windowName.Contains("BlueStacks"))
                 emulatorMode = "BlueStacks";
 
-            LoggerHelper.Info($"Emulator mode detected: {emulatorMode}");
+            LoggerHelper.Info($"已识别模拟器关闭模式：模式={emulatorMode}");
 
             return emulatorMode switch
             {
@@ -55,7 +55,7 @@ public static class EmulatorHelper
         }
         catch (Exception e)
         {
-            LoggerHelper.Error($"Failed to close emulator: {e.Message}");
+            LoggerHelper.Error($"关闭模拟器失败：原因={e.Message}", e);
             return false;
         }
     }
@@ -84,19 +84,19 @@ public static class EmulatorHelper
                         break;
                     case 7555:
                         emuIndex = 0;
-                        LoggerHelper.Warning("Port 7555 is deprecated for MuMu6, please use 16384 or above.");
+                        LoggerHelper.Warning("MuMu6 的 7555 端口已不推荐使用，请改用 16384 及以上端口。");
                         break;
                     case >= 5555:
                         emuIndex = (port - 5555) / 2;
                         break;
                     default:
-                        LoggerHelper.Error($"Port {port} is not valid for MuMuEmulator12");
+                        LoggerHelper.Error($"MuMuEmulator12 端口无效：端口={port}");
                         return false;
                 }
             }
             else
             {
-                LoggerHelper.Error($"Failed to parse port from address {address}");
+                LoggerHelper.Error($"解析地址中的端口失败：地址={address}");
                 return false;
             }
         }
@@ -109,13 +109,13 @@ public static class EmulatorHelper
             }
             else
             {
-                LoggerHelper.Error($"Failed to parse port from emulator style address {address}");
+                LoggerHelper.Error($"解析模拟器风格地址中的端口失败：地址={address}");
                 return false;
             }
         }
         else
         {
-            LoggerHelper.Error($"Unsupported address format: {address}");
+            LoggerHelper.Error($"不支持的地址格式：地址={address}");
             return false;
         }
 
@@ -138,8 +138,7 @@ public static class EmulatorHelper
         }
         catch (Exception e)
         {
-            LoggerHelper.Error("Failed to get the main module of the emulator process.");
-            LoggerHelper.Error(e.Message);
+            LoggerHelper.Error($"获取模拟器进程主模块失败：原因={e.Message}", e);
             return false;
         }
 
@@ -181,15 +180,15 @@ public static class EmulatorHelper
             var process = Process.Start(startInfo);
             if (process != null && process.WaitForExit(5000))
             {
-                LoggerHelper.Info($"Emulator at index {emuIndex} closed through console. Console path: {consolePath}");
+                LoggerHelper.Info($"已通过控制台关闭模拟器：索引={emuIndex}，控制台路径={consolePath}");
                 return true;
             }
 
-            LoggerHelper.Warning($"Console process at index {emuIndex} did not exit within the specified timeout. Killing emulator by window. Console path: {consolePath}");
+            LoggerHelper.Warning($"控制台关闭模拟器超时，准备改为按窗口关闭：索引={emuIndex}，控制台路径={consolePath}");
             return KillEmulatorByWindow(processor);
         }
 
-        LoggerHelper.Error("MuMuManager.exe not found in expected locations (new or old). Trying to kill emulator by window.");
+        LoggerHelper.Error("未在预期位置找到 MuMuManager.exe，准备改为按窗口关闭模拟器。");
         return KillEmulatorByWindow(processor);
     }
 

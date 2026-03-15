@@ -141,7 +141,7 @@ public class FocusHandler
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"处理焦点协议消息失败：原因={e.Message}", e);
         }
     }
 
@@ -422,7 +422,7 @@ public class FocusHandler
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"解析带变量的焦点文本失败：原因={e.Message}", e);
             ErrorView.ShowException(e);
             return content;
         }

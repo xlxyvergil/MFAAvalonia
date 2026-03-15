@@ -408,7 +408,7 @@ public partial class RootViewContent : UserControl
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Failed to start tutorial: {ex.Message}");
+            LoggerHelper.Error($"启动新手引导失败：原因={ex.Message}", ex);
         }
     }
 

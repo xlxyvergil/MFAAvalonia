@@ -49,7 +49,7 @@ public static class ConfigurationManager
 
     public static void Initialize()
     {
-        LoggerHelper.Info("Current Configuration: " + GetCurrentConfiguration());
+        LoggerHelper.Info("当前配置：" + GetCurrentConfiguration());
     }
 
     public static void SwitchConfiguration(string? name)
@@ -64,6 +64,13 @@ public static class ConfigurationManager
 
         if (ConfigName.Equals(name, StringComparison.OrdinalIgnoreCase))
             return;
+
+        LoggerHelper.UserAction(
+            "切换配置",
+            $"from={ConfigName} -> to={name}",
+            source: "UI",
+            operation: "SwitchConfiguration",
+            configName: ConfigName);
 
         if (!Configs.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
         {
@@ -84,6 +91,7 @@ public static class ConfigurationManager
         if (Instances.RootViewModel.IsRunning)
         {
             ToastHelper.Warn(LangKeys.SwitchConfiguration.ToLocalization());
+            LoggerHelper.Warning($"配置切换被拒绝，因为当前仍有任务正在运行：目标配置={name}");
             lock (_switchLock)
             {
                 IsSwitching = false;
@@ -117,6 +125,7 @@ public static class ConfigurationManager
 
             await DispatcherHelper.RunOnMainThreadAsync(() => ConfigurationSwitched?.Invoke(name));
             await Instances.ReloadConfigurationForSwitchAsync();
+            LoggerHelper.Info($"配置切换完成：当前配置={ConfigName}");
 
             DispatcherHelper.PostOnMainThread(() => Instances.RootViewModel.SetConfigSwitchProgress(98));
         }
@@ -159,7 +168,7 @@ public static class ConfigurationManager
 
     private static AvaloniaList<MFAConfiguration> LoadConfigurations()
     {
-        LoggerHelper.Info("Loading Configurations...");
+        LoggerHelper.Info("正在加载配置列表...");
         ConfigName = GetDefaultConfig();
 
         var collection = new AvaloniaList<MFAConfiguration>();

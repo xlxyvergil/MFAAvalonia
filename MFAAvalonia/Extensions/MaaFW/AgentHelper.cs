@@ -81,7 +81,7 @@ public static class AgentHelper
             }
             catch (Exception ex)
             {
-                LoggerHelper.Error($"Failed to start agent '{agentConfig.ChildExec}': {ex.Message}");
+                LoggerHelper.Error($"启动 Agent 失败：{agentConfig.ChildExec}，原因：{ex.Message}");
                 processor.AddLogByKey(LangKeys.AgentStartFailed, Avalonia.Media.Brushes.OrangeRed, changeColor: false);
                 ToastHelper.Error(LangKeys.AgentStartFailed.ToLocalization(), ex.Message);
                 // 清理已启动的 agent
@@ -112,7 +112,7 @@ public static class AgentHelper
         var identifier = string.IsNullOrWhiteSpace(agentConfig.Identifier)
             ? new string(Enumerable.Repeat(chars, 8).Select(c => c[Random.Next(c.Length)]).ToArray())
             : agentConfig.Identifier;
-        LoggerHelper.Info($"Agent Identifier: {identifier}");
+        LoggerHelper.Info($"Agent 标识符：{identifier}");
 
         ctx.Client = instanceConfig.GetValue(ConfigurationKeys.AgentTcpMode, false)
             ? MaaAgentClient.CreateTcp(tasker)
@@ -123,11 +123,11 @@ public static class AgentHelper
             ctx.Client.SetTimeout(TimeSpan.FromSeconds(timeOut));
         ctx.Client.Releasing += (_, _) =>
         {
-            LoggerHelper.Info("退出Agent进程");
+            LoggerHelper.Info("Agent 进程已退出。");
             ctx.Client = null;
         };
 
-        LoggerHelper.Info($"Agent Client Hash: {ctx.Client?.GetHashCode()}");
+        LoggerHelper.Info($"Agent 客户端哈希：{ctx.Client?.GetHashCode()}");
 
         if (!Directory.Exists(AppPaths.DataRoot))
             Directory.CreateDirectory(AppPaths.DataRoot);
@@ -170,19 +170,19 @@ public static class AgentHelper
         };
 
         LoggerHelper.Info(
-            $"Agent Command: {program} {(program!.Contains("python") && replacedArgs.Contains(".py") && !replacedArgs.Any(arg => arg.Contains("-u")) ? "-u " : "")}{string.Join(" ", replacedArgs)} {ctx.Client.Id} "
-            + $"socket_id: {ctx.Client.Id}");
+            $"Agent 启动命令：{program} {(program!.Contains("python") && replacedArgs.Contains(".py") && !replacedArgs.Any(arg => arg.Contains("-u")) ? "-u " : "")}{string.Join(" ", replacedArgs)} {ctx.Client.Id} "
+            + $"socket_id={ctx.Client.Id}");
 
         IMaaAgentClient.AgentServerStartupMethod method = (s, directory) =>
         {
             ctx.Process = System.Diagnostics.Process.Start(startInfo);
             if (ctx.Process == null)
-                LoggerHelper.Error("Agent start failed!");
+                LoggerHelper.Error("Agent 启动失败。");
             else
             {
                 ctx.Process.Exited += (_, _) =>
                 {
-                    LoggerHelper.Info("Agent process exited!");
+                    LoggerHelper.Info("Agent 进程已退出。");
                     StopReadStreams(ctx);
                     ctx.Process = null;
                 };
@@ -213,7 +213,7 @@ public static class AgentHelper
 
                 if (retryCount > 0)
                 {
-                    LoggerHelper.Info($"Agent LinkStart retry attempt {retryCount + 1}/{maxRetries}");
+                    LoggerHelper.Info($"Agent LinkStart 重试：第 {retryCount + 1}/{maxRetries} 次。");
                     processor.AddLog(LangKeys.AgentConnectionRetry.ToLocalizationFormatted(false, $"{retryCount + 1}/{maxRetries}"),
                         Avalonia.Media.Brushes.Orange, changeColor: false);
                     await Task.Delay(1000 * retryCount, token);
@@ -227,7 +227,7 @@ public static class AgentHelper
                         }
                         catch (Exception killEx)
                         {
-                            LoggerHelper.Warning($"Failed to kill agent process: {killEx.Message}");
+                            LoggerHelper.Warning($"结束 Agent 进程失败：{killEx.Message}");
                         }
                         ctx.Process.Dispose();
                         ctx.Process = null;
@@ -238,19 +238,19 @@ public static class AgentHelper
             }
             catch (OperationCanceledException)
             {
-                LoggerHelper.Info("Agent LinkStart was canceled by user");
+                LoggerHelper.Info("用户已取消 Agent LinkStart。");
                 throw;
             }
             catch (SEHException sehEx)
             {
                 lastException = sehEx;
-                LoggerHelper.Warning($"SEHException during LinkStart (attempt {retryCount + 1}): {sehEx.Message}");
+                LoggerHelper.Warning($"Agent LinkStart 发生 SEHException（第 {retryCount + 1} 次）：{sehEx.Message}");
 
                 if (retryCount < maxRetries - 1)
                 {
                     if (token.IsCancellationRequested)
                     {
-                        LoggerHelper.Info("Agent retry canceled by user");
+                        LoggerHelper.Info("用户已取消 Agent 重试。");
                         token.ThrowIfCancellationRequested();
                     }
 
@@ -264,11 +264,11 @@ public static class AgentHelper
                         timeOut = agentConfig.Timeout ?? -1;
                         if (timeOut > 0)
                             ctx.Client.SetTimeout(TimeSpan.FromSeconds(timeOut));
-                        ctx.Client.Releasing += (_, _) => LoggerHelper.Info("退出Agent进程");
+                        ctx.Client.Releasing += (_, _) => LoggerHelper.Info("Agent 进程已退出。");
                     }
                     catch (Exception recreateEx)
                     {
-                        LoggerHelper.Error($"Failed to recreate AgentClient: {recreateEx.Message}");
+                        LoggerHelper.Error($"重建 AgentClient 失败：{recreateEx.Message}");
                         throw;
                     }
                 }
@@ -276,14 +276,14 @@ public static class AgentHelper
             catch (Exception ex)
             {
                 lastException = ex;
-                LoggerHelper.Warning($"Exception during LinkStart (attempt {retryCount + 1}): {ex.Message}");
+                LoggerHelper.Warning($"Agent LinkStart 发生异常（第 {retryCount + 1} 次）：{ex.Message}");
                 break;
             }
         }
 
         if (token.IsCancellationRequested && !linkStartSuccess)
         {
-            LoggerHelper.Info("Agent LinkStart loop exited due to cancellation");
+            LoggerHelper.Info("Agent LinkStart 循环因取消而退出。");
             token.ThrowIfCancellationRequested();
         }
 
@@ -303,17 +303,17 @@ public static class AgentHelper
                         var exitCode = agentProcess.ExitCode;
                         var stderr = await agentProcess.StandardError.ReadToEndAsync(token);
                         var stdout = await agentProcess.StandardOutput.ReadToEndAsync(token);
-                        errorDetails.AppendLine($"Agent process exited with code: {exitCode}");
+                        errorDetails.AppendLine($"Agent 进程退出码：{exitCode}");
                         if (!string.IsNullOrWhiteSpace(stderr))
                         {
-                            errorDetails.AppendLine($"StandardError: {stderr}");
-                            LoggerHelper.Error($"Agent StandardError: {stderr}");
+                            errorDetails.AppendLine($"标准错误输出：{stderr}");
+                            LoggerHelper.Error($"Agent 标准错误输出：{stderr}");
                             processor.AddLog($"Agent Error: {stderr}", Avalonia.Media.Brushes.OrangeRed, changeColor: false);
                         }
                         if (!string.IsNullOrWhiteSpace(stdout))
                         {
-                            errorDetails.AppendLine($"StandardOutput: {stdout}");
-                            LoggerHelper.Info($"Agent StandardOutput: {stdout}");
+                            errorDetails.AppendLine($"标准输出：{stdout}");
+                            LoggerHelper.Info($"Agent 标准输出：{stdout}");
                         }
                         errorMessage = errorDetails.ToString();
                     }
@@ -324,16 +324,16 @@ public static class AgentHelper
                             var exitCode = agentProcess.ExitCode;
                             var stderr = await agentProcess.StandardError.ReadToEndAsync(token);
                             var stdout = await agentProcess.StandardOutput.ReadToEndAsync(token);
-                            errorDetails.AppendLine($"Agent process exited with code: {exitCode}");
+                            errorDetails.AppendLine($"Agent 进程退出码：{exitCode}");
                             if (!string.IsNullOrWhiteSpace(stderr))
                             {
-                                errorDetails.AppendLine($"StandardError: {stderr}");
-                                LoggerHelper.Error($"Agent StandardError: {stderr}");
+                                errorDetails.AppendLine($"标准错误输出：{stderr}");
+                                LoggerHelper.Error($"Agent 标准错误输出：{stderr}");
                                 processor.AddLog($"Agent Error: {stderr}", Avalonia.Media.Brushes.OrangeRed, changeColor: false);
                                 if (!string.IsNullOrWhiteSpace(stdout))
                                 {
-                                    errorDetails.AppendLine($"StandardOutput: {stdout}");
-                                    LoggerHelper.Info($"Agent StandardOutput: {stdout}");
+                                    errorDetails.AppendLine($"标准输出：{stdout}");
+                                    LoggerHelper.Info($"Agent 标准输出：{stdout}");
                                     errorMessage = errorDetails.ToString();
                                 }
                             }
@@ -342,7 +342,7 @@ public static class AgentHelper
                 }
                 catch (Exception readEx)
                 {
-                    LoggerHelper.Warning($"Failed to read agent process output: {readEx.Message}");
+                    LoggerHelper.Warning($"读取 Agent 进程输出失败：{readEx.Message}");
                 }
             }
             throw new Exception(errorMessage);
@@ -385,7 +385,7 @@ public static class AgentHelper
         // 步骤 1: 停止 AgentClient
         if (agentClient != null)
         {
-            LoggerHelper.Info("Stopping AgentClient connection");
+            LoggerHelper.Info("正在停止 AgentClient 连接。");
             try
             {
                 bool shouldStop = false;
@@ -397,24 +397,24 @@ public static class AgentHelper
                     try
                     {
                         agentClient.LinkStop();
-                        LoggerHelper.Info("AgentClient LinkStop succeeded");
+                        LoggerHelper.Info("AgentClient LinkStop 成功。");
                     }
                     catch (Exception e)
                     {
-                        LoggerHelper.Warning($"AgentClient LinkStop failed: {e.Message}");
+                        LoggerHelper.Warning($"AgentClient LinkStop 失败：{e.Message}");
                     }
                 }
             }
             catch (Exception e)
             {
-                LoggerHelper.Warning($"AgentClient LinkStop check failed: {e.Message}");
+                LoggerHelper.Warning($"检查 AgentClient LinkStop 状态失败：{e.Message}");
             }
         }
 
         // 步骤 2: 终止进程
         if (agentProcess != null)
         {
-            LoggerHelper.Info("Terminating Agent process");
+            LoggerHelper.Info("正在终止 Agent 进程。");
             try
             {
                 var hasExited = true;
@@ -422,36 +422,36 @@ public static class AgentHelper
                 catch (InvalidOperationException) { }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Warning($"Failed to check if agent process has exited: {ex.Message}");
+                    LoggerHelper.Warning($"检查 Agent 进程是否退出失败：{ex.Message}");
                 }
 
                 if (!hasExited)
                 {
                     try
                     {
-                        LoggerHelper.Info($"Kill AgentProcess: {agentProcess.ProcessName}");
+                        LoggerHelper.Info($"正在结束 Agent 进程：{agentProcess.ProcessName}");
                         agentProcess.Kill(true);
                         agentProcess.WaitForExit(5000);
-                        LoggerHelper.Info("Agent process killed successfully");
+                        LoggerHelper.Info("Agent 进程已成功结束。");
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Warning($"Failed to kill agent process: {ex.Message}");
+                        LoggerHelper.Warning($"结束 Agent 进程失败：{ex.Message}");
                     }
                 }
                 else
                 {
-                    LoggerHelper.Info("AgentProcess has already exited");
+                    LoggerHelper.Info("Agent 进程已提前退出。");
                 }
             }
             catch (Exception e)
             {
-                LoggerHelper.Error($"Error handling agent process: {e.Message}");
+                LoggerHelper.Error($"处理 Agent 进程时发生错误：{e.Message}");
             }
             finally
             {
                 try { agentProcess.Dispose(); }
-                catch (Exception e) { LoggerHelper.Warning($"AgentProcess Dispose failed: {e.Message}"); }
+                catch (Exception e) { LoggerHelper.Warning($"释放 Agent 进程对象失败：{e.Message}"); }
             }
         }
 
@@ -512,7 +512,7 @@ public static class AgentHelper
             if (MaaProcessor.CheckShouldLog(outData))
                 processor.AddLog(outData, (Avalonia.Media.IBrush?)null);
             else
-                LoggerHelper.Info("agent:" + outData);
+                LoggerHelper.Info("Agent 输出：" + outData);
         });
     }
 
@@ -537,24 +537,24 @@ public static class AgentHelper
     {
         if (maaTasker.IsRunning && !maaTasker.IsStopping)
         {
-            LoggerHelper.Info("Stopping MaaTasker before dispose");
+            LoggerHelper.Info("释放前正在停止 MaaTasker。");
             try
             {
                 var stopResult = maaTasker.Stop().Wait();
-                LoggerHelper.Info($"MaaTasker Stop result: {stopResult}");
+                LoggerHelper.Info($"MaaTasker 停止结果：{stopResult}");
             }
-            catch (ObjectDisposedException) { LoggerHelper.Info("MaaTasker was already disposed during Stop"); }
-            catch (Exception e) { LoggerHelper.Warning($"MaaTasker Stop failed: {e.Message}"); }
+            catch (ObjectDisposedException) { LoggerHelper.Info("停止 MaaTasker 时对象已被释放。"); }
+            catch (Exception e) { LoggerHelper.Warning($"停止 MaaTasker 失败：{e.Message}"); }
         }
 
-        LoggerHelper.Info("Disposing MaaTasker");
+        LoggerHelper.Info("正在释放 MaaTasker。");
         try
         {
             maaTasker.Dispose();
-            LoggerHelper.Info("MaaTasker disposed successfully");
+            LoggerHelper.Info("MaaTasker 已成功释放。");
         }
-        catch (ObjectDisposedException) { LoggerHelper.Info("MaaTasker was already disposed"); }
-        catch (Exception e) { LoggerHelper.Warning($"MaaTasker Dispose failed: {e.Message}"); }
+        catch (ObjectDisposedException) { LoggerHelper.Info("MaaTasker 已提前释放。"); }
+        catch (Exception e) { LoggerHelper.Warning($"释放 MaaTasker 失败：{e.Message}"); }
     }
 
     #endregion
@@ -590,7 +590,7 @@ public static class AgentHelper
                 ctx.JobHandle = CreateJobObject(IntPtr.Zero, null);
                 if (ctx.JobHandle == null || ctx.JobHandle.IsInvalid)
                 {
-                    LoggerHelper.Warning($"CreateJobObject failed: {Marshal.GetLastWin32Error()}");
+                    LoggerHelper.Warning($"CreateJobObject 失败：{Marshal.GetLastWin32Error()}");
                     ctx.JobHandle = null;
                     return;
                 }
@@ -606,7 +606,7 @@ public static class AgentHelper
                 if (!SetInformationJobObject(ctx.JobHandle, JOBOBJECTINFOCLASS.JobObjectExtendedLimitInformation,
                         ref info, (uint)Marshal.SizeOf<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()))
                 {
-                    LoggerHelper.Warning($"SetInformationJobObject failed: {Marshal.GetLastWin32Error()}");
+                    LoggerHelper.Warning($"SetInformationJobObject 失败：{Marshal.GetLastWin32Error()}");
                     ctx.JobHandle.Dispose();
                     ctx.JobHandle = null;
                     return;
@@ -614,7 +614,7 @@ public static class AgentHelper
             }
 
             if (!AssignProcessToJobObject(ctx.JobHandle, ctx.Process.Handle))
-                LoggerHelper.Warning($"AssignProcessToJobObject failed: {Marshal.GetLastWin32Error()}");
+                LoggerHelper.Warning($"AssignProcessToJobObject 失败：{Marshal.GetLastWin32Error()}");
         }
     }
 

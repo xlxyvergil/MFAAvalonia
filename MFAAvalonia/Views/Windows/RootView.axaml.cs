@@ -52,7 +52,7 @@ public partial class RootView : SukiWindow
         // 修改Loaded事件处理
         Loaded += (_, _) =>
         {
-            LoggerHelper.Info("UI initialization started");
+            LoggerHelper.Info("界面初始化开始");
 
             // 确保在UI线程上执行
             DispatcherHelper.PostOnMainThread(() =>
@@ -150,7 +150,7 @@ public partial class RootView : SukiWindow
             }
             DispatcherHelper.PostOnMainThread(SaveWindowSizeAndPositionImmediately);
             if (!noLog)
-                LoggerHelper.Info("MFA Closed!");
+                LoggerHelper.Info("应用已关闭");
             TrayIconManager.DisposeTrayIcon(Application.Current);
             // Instances.TaskQueueViewModel.Processor.SetTasker(); // SetTasker on disposed/stopping processor? Maybe not needed or should be loop?
             // Assuming this was to clean up or reset. Dispose should be enough.
@@ -193,7 +193,7 @@ public partial class RootView : SukiWindow
             }
             catch (Exception e)
             {
-                LoggerHelper.Error(e);
+                LoggerHelper.Error($"执行关闭前回调失败：原因={e.Message}", e);
             }
             finally { Instances.ShutdownApplication(); }
 
@@ -215,16 +215,16 @@ public partial class RootView : SukiWindow
                     var lastWriteTime = File.GetLastWriteTimeUtc(rfile);
                     if (lastWriteTime > DateTime.UtcNow.AddDays(-7))
                     {
-                        LoggerHelper.Info("Keeping recent backup file: " + rfile);
+                        LoggerHelper.Info("保留最近的备份文件：" + rfile);
                         continue;
                     }
                     File.SetAttributes(rfile, FileAttributes.Normal);
-                    LoggerHelper.Info("Deleting file: " + rfile);
+                    LoggerHelper.Info("正在删除文件：" + rfile);
                     File.Delete(rfile);
                 }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Error($"文件删除失败: {rfile}", ex);
+                    LoggerHelper.Error($"文件删除失败：{rfile}", ex);
                 }
             }
 
@@ -422,7 +422,7 @@ public partial class RootView : SukiWindow
                         Height = height;
                         _lastValidWidth = width;
                         _lastValidHeight = height;
-                        LoggerHelper.Info($"窗口大小已加载: width={width}, height={height}");
+                        LoggerHelper.Info($"窗口大小已加载：宽度={width}，高度={height}");
                     }
                 }
             }
@@ -443,7 +443,7 @@ public partial class RootView : SukiWindow
                         WindowStartupLocation = WindowStartupLocation.Manual;
                         _hasValidPosition = true; // 标记已有有效位置
                         _lastValidPosition = new PixelPoint(posX, posY); // 缓存位置
-                        LoggerHelper.Info($"窗口位置已加载: X={posX}, Y={posY}");
+                        LoggerHelper.Info($"窗口位置已加载：X={posX}，Y={posY}");
                     }
                     else
                     {
@@ -462,7 +462,7 @@ public partial class RootView : SukiWindow
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"加载窗口大小和位置失败: {ex.Message}");
+            LoggerHelper.Error($"加载窗口大小和位置失败：{ex.Message}");
         }
     }
 
@@ -575,7 +575,7 @@ public partial class RootView : SukiWindow
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"更新缓存窗口状态失败: {ex.Message}");
+            LoggerHelper.Error($"更新缓存窗口状态失败：{ex.Message}");
         }
     }
 
@@ -614,7 +614,7 @@ public partial class RootView : SukiWindow
             }
             catch (Exception ex)
             {
-                LoggerHelper.Error($"防抖保存任务失败: {ex.Message}");
+                LoggerHelper.Error($"防抖保存任务失败：{ex.Message}");
             }
         }, token);
     }
@@ -646,7 +646,7 @@ public partial class RootView : SukiWindow
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"保存窗口大小和位置失败: {ex.Message}");
+            LoggerHelper.Error($"保存窗口大小和位置失败：{ex.Message}");
         }
     }
 

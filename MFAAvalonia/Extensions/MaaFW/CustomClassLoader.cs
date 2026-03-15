@@ -50,7 +50,7 @@ public static class CustomClassLoader
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Warning($"Failed to get metadata for assembly {assembly.FullName}: {ex.Message}");
+                        LoggerHelper.Warning($"获取程序集元数据失败：程序集={assembly.FullName}，原因={ex.Message}");
                     }
                 }
             }
@@ -68,7 +68,7 @@ public static class CustomClassLoader
             }
             catch (Exception ex)
             {
-                LoggerHelper.Warning($"Failed to add System.Linq.Expressions reference: {ex.Message}");
+                LoggerHelper.Warning($"添加 System.Linq.Expressions 元数据引用失败：原因={ex.Message}");
             }
         }
         return _metadataReferences;
@@ -86,7 +86,7 @@ public static class CustomClassLoader
 
         if (!Directory.Exists(directory))
         {
-            LoggerHelper.Info($"Custom directory does not exist: {directory}");
+            LoggerHelper.Info($"自定义类目录不存在：目录={directory}");
             return customClasses;
         }
 
@@ -104,18 +104,18 @@ public static class CustomClassLoader
                 _watcher.Created += OnFileChanged;
                 _watcher.Deleted += OnFileChanged;
                 _watcher.Renamed += OnFileChanged;
-                LoggerHelper.Info($"File watcher started for directory: {directory}");
+                LoggerHelper.Info($"已启动自定义类目录监听：目录={directory}");
             }
             catch (Exception ex)
             {
-                LoggerHelper.Warning($"Failed to create file watcher: {ex.Message}");
+                LoggerHelper.Warning($"创建自定义类目录监听失败：目录={directory}，原因={ex.Message}");
             }
         }
 
         var csFiles = Directory.GetFiles(directory, "*.cs");
         if (csFiles.Length == 0)
         {
-            LoggerHelper.Info($"No .cs files found in directory: {directory}");
+            LoggerHelper.Info($"自定义类目录中未找到 .cs 文件：目录={directory}");
             return customClasses;
         }
 
@@ -126,7 +126,7 @@ public static class CustomClassLoader
             try
             {
                 var name = Path.GetFileNameWithoutExtension(filePath);
-                LoggerHelper.Info($"Trying to parse custom class: {name}");
+                LoggerHelper.Info($"开始解析自定义类：名称={name}，文件={filePath}");
 
                 var code = File.ReadAllText(filePath);
                 var codeLines = code.Split(new[]
@@ -171,11 +171,11 @@ public static class CustomClassLoader
                     select new CustomValue<object>(name, instance);
 
                 customClasses.AddRange(instances);
-                LoggerHelper.Info($"Successfully loaded custom class: {name}");
+                LoggerHelper.Info($"已成功加载自定义类：名称={name}，文件={filePath}");
             }
             catch (Exception ex)
             {
-                LoggerHelper.Error($"Failed to load custom class from {filePath}: {ex.Message}");
+                LoggerHelper.Error($"加载自定义类失败：文件={filePath}，原因={ex.Message}", ex);
             }
         }
 
@@ -194,7 +194,7 @@ public static class CustomClassLoader
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Failed to create instance of type {type.FullName}: {ex.Message}");
+            LoggerHelper.Warning($"创建自定义类实例失败：类型={type.FullName}，原因={ex.Message}");
             return null;
         }
     }
@@ -204,7 +204,7 @@ public static class CustomClassLoader
     /// </summary>
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        LoggerHelper.Info($"Custom class file changed: {e.FullPath} ({e.ChangeType})");
+        LoggerHelper.Info($"自定义类文件发生变化：文件={e.FullPath}，变更类型={e.ChangeType}");
         _shouldLoadCustomClasses = true;
         _customClasses = null;
     }
@@ -225,7 +225,7 @@ public static class CustomClassLoader
         {
             foreach (var value in _customClasses)
             {
-                LoggerHelper.Info($"Using cached custom class: {value.Name}");
+                LoggerHelper.Info($"使用缓存中的自定义类：名称={value.Name}");
             }
         }
         return _customClasses;
@@ -238,7 +238,7 @@ public static class CustomClassLoader
     {
         _shouldLoadCustomClasses = true;
         _customClasses = null;
-        LoggerHelper.Info("Custom classes will be reloaded on next access");
+        LoggerHelper.Info("已标记自定义类缓存失效，将在下次访问时重新加载。");
     }
 
     /// <summary>
@@ -257,7 +257,7 @@ public static class CustomClassLoader
                 _watcher.Renamed -= OnFileChanged;
                 _watcher.Dispose();
                 _watcher = null;
-                LoggerHelper.Info("File watcher disposed");
+                LoggerHelper.Info("已释放自定义类目录监听器。");
             }
             _customClasses = null;
             _metadataReferences = null;
@@ -265,7 +265,7 @@ public static class CustomClassLoader
         catch (Exception ex)
         {
             //忽略清理过程中的异常，这可能是由于 Microsoft.CodeAnalysis 程序集未加载导致的
-            LoggerHelper.Warning($"CustomClassLoader.Dispose() encountered an error: {ex.Message}");
+            LoggerHelper.Warning($"释放自定义类加载器资源时出现异常：原因={ex.Message}");
         }
     }
 }

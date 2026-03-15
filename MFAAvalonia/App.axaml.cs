@@ -87,7 +87,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"应用初始化失败：{ex}");
+            LoggerHelper.Error($"应用初始化失败：原因={ex.Message}", ex);
             ShowStartupErrorAndExit(ex, "应用初始化");
         }
     }
@@ -203,7 +203,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"框架初始化失败：{ex}");
+            LoggerHelper.Error($"框架初始化失败：原因={ex.Message}", ex);
             ShowStartupErrorAndExit(ex, "框架初始化");
         }
     }
@@ -250,11 +250,11 @@ public partial class App : Application
             // 清除字体缓存（保留当前使用的字体）
             FontService.Instance.ClearFontCache();
 
-            LoggerHelper.Info("[内存管理]已清除应用程序缓存");
+            LoggerHelper.Info("[内存管理] 已清除应用程序缓存。");
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"[内存管理]清除缓存时发生错误: {ex.Message}");
+            LoggerHelper.Warning($"[内存管理] 清除缓存失败：原因={ex.Message}");
         }
     }
 
@@ -268,11 +268,11 @@ public partial class App : Application
             // 强制清理所有字体资源
             FontService.Instance.ForceCleanupAllFontResources();
 
-            LoggerHelper.Info("[内存管理]已强制清理所有应用资源");
+            LoggerHelper.Info("[内存管理] 已强制清理所有应用资源。");
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"[内存管理]强制清理资源时发生错误: {ex.Message}");
+            LoggerHelper.Warning($"[内存管理] 强制清理资源失败：原因={ex.Message}");
         }
     }
 
@@ -334,7 +334,7 @@ public partial class App : Application
             // 如果已经显示过启动错误，不再显示其他错误对话框
             if (System.Threading.Interlocked.CompareExchange(ref _hasShownStartupError, 0, 0) == 1)
             {
-                LoggerHelper.Error($"启动失败后的UI线程异常（已忽略显示）: {e.Exception}");
+                LoggerHelper.Error($"启动失败后又发生 UI 线程异常，已忽略弹窗：原因={e.Exception.Message}", e.Exception);
                 e.Handled = true;
                 return;
             }
@@ -342,7 +342,7 @@ public partial class App : Application
             if (TryIgnoreException(e.Exception, out string errorMessage))
             {
                 LoggerHelper.Warning(errorMessage);
-                LoggerHelper.Error(e.Exception.ToString());
+                LoggerHelper.Error($"已忽略 UI 线程异常：原因={e.Exception.Message}", e.Exception);
                 e.Handled = true;
                 return;
             }
@@ -353,7 +353,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error("处理UI线程异常时发生错误: " + ex.ToString());
+            LoggerHelper.Error($"处理 UI 线程异常时发生错误：原因={ex.Message}", ex);
             if (System.Threading.Interlocked.CompareExchange(ref _hasShownStartupError, 0, 0) == 0)
             {
                 ErrorView.ShowException(ex, true);
@@ -368,14 +368,14 @@ public partial class App : Application
             // 如果已经显示过启动错误，不再显示其他错误对话框
             if (System.Threading.Interlocked.CompareExchange(ref _hasShownStartupError, 0, 0) == 1)
             {
-                LoggerHelper.Error($"启动失败后的非UI线程异常（已忽略显示）: {e.ExceptionObject}");
+                LoggerHelper.Error($"启动失败后又发生非 UI 线程异常，已忽略弹窗：对象={e.ExceptionObject}");
                 return;
             }
 
             if (e.ExceptionObject is Exception ex && TryIgnoreException(ex, out string errorMessage))
             {
                 LoggerHelper.Warning(errorMessage);
-                LoggerHelper.Error(ex.ToString());
+                LoggerHelper.Error($"已忽略非 UI 线程异常：原因={ex.Message}", ex);
                 return;
             }
 
@@ -394,11 +394,11 @@ public partial class App : Application
             {
                 sbEx.Append(e.ExceptionObject);
             }
-            LoggerHelper.Error(sbEx.ToString());
+            LoggerHelper.Error($"捕获到非 UI 线程未处理异常：详情={sbEx}", e.ExceptionObject as Exception ?? new Exception(sbEx.ToString()));
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error("处理非UI线程异常时发生错误: " + ex.ToString());
+            LoggerHelper.Error($"处理非 UI 线程异常时发生错误：原因={ex.Message}", ex);
         }
     }
 
@@ -409,7 +409,7 @@ public partial class App : Application
             // 如果已经显示过启动错误，不再显示其他错误对话框
             if (System.Threading.Interlocked.CompareExchange(ref _hasShownStartupError, 0, 0) == 1)
             {
-                LoggerHelper.Error($"启动失败后的任务异常（已忽略显示）: {e.Exception}");
+                LoggerHelper.Error($"启动失败后又发生未观察任务异常，已忽略弹窗：原因={e.Exception.Message}", e.Exception);
                 e.SetObserved();
                 return;
             }
@@ -417,7 +417,7 @@ public partial class App : Application
             if (TryIgnoreException(e.Exception, out string errorMessage))
             {
                 LoggerHelper.Warning(errorMessage);
-                LoggerHelper.Info(e.Exception.ToString());
+                LoggerHelper.Info($"已忽略未观察任务异常：原因={e.Exception.Message}");
             }
             else
             {
@@ -436,7 +436,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error("处理未观察任务异常时发生错误: " + ex.ToString());
+            LoggerHelper.Error($"处理未观察任务异常时发生错误：原因={ex.Message}", ex);
             e.SetObserved();
         }
     }
@@ -462,7 +462,7 @@ public partial class App : Application
         if (ex is IOException exception && exception.Message.Contains("EOF"))
         {
             errorMessage = "SSL验证证书错误";
-            LoggerHelper.Warning(exception);
+            LoggerHelper.Warning($"已忽略 EOF 类型 IO 异常：原因={exception.Message}");
             return true;
         }
 
@@ -475,7 +475,7 @@ public partial class App : Application
 
         if (ex is InvalidOperationException && ex.Message.Contains("Stop"))
         {
-            errorMessage = "已忽略与Stop相关的异常: " + ex.Message;
+            errorMessage = "已忽略与 Stop 相关的异常：" + ex.Message;
             return true;
         }
 
@@ -507,7 +507,7 @@ public partial class App : Application
 // 这些异常已经在业务逻辑中处理了（如显示连接失败消息），不应该再次显示给用户
         if (ex is SEHException)
         {
-            errorMessage = "已忽略外部组件异常(SEHException): " + ex.Message;
+            errorMessage = "已忽略外部组件异常（SEHException）：" + ex.Message;
             return true;
         }
 

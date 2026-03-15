@@ -139,7 +139,7 @@ public static class SimpleEncryptionHelper
         }
         catch (Exception e)
         {
-            LoggerHelper.Error(e);
+            LoggerHelper.Error($"获取设备唯一标识失败：原因={e.Message}", e);
             return string.Empty;
         }
         return string.Empty;

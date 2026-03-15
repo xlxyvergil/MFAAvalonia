@@ -54,18 +54,18 @@ public class HotkeyIpcClient : IDisposable
 
             // 首先尝试从文件读取端口
             int? savedPort = HotkeyIpcServer.LoadPortFromFile();
-            LoggerHelper.Info($"HotkeyIpcClient: 端口文件读取结果 = {savedPort?.ToString() ?? "null"}");
+            LoggerHelper.Info($"热键 IPC 客户端读取端口文件结果：端口={(savedPort?.ToString() ?? "null")}");
             if (savedPort.HasValue)
             {
-                LoggerHelper.Info($"HotkeyIpcClient: 尝试连接文件中的端口 {savedPort.Value}");
+                LoggerHelper.Info($"热键 IPC 客户端准备连接端口文件中的端口：端口={savedPort.Value}");
                 var result = await TryConnectToPort(savedPort.Value);
-                LoggerHelper.Info($"HotkeyIpcClient: 文件端口 {savedPort.Value} 连接结果 = {result}");
+                LoggerHelper.Info($"热键 IPC 客户端端口文件连接结果：端口={savedPort.Value}，成功={result}");
                 if (result)
                     return true;
             }
 
             // 如果文件中的端口不可用，扫描端口范围
-            LoggerHelper.Info($"HotkeyIpcClient: 扫描端口范围 {DefaultPort}-{DefaultPort + PortRange - 1}");
+            LoggerHelper.Info($"热键 IPC 客户端开始扫描端口范围：范围={DefaultPort}-{DefaultPort + PortRange - 1}");
             for (int i = 0; i < PortRange; i++)
             {
                 int port = DefaultPort + i;
@@ -76,12 +76,12 @@ public class HotkeyIpcClient : IDisposable
                     return true;
             }
 
-            LoggerHelper.Warning("HotkeyIpcClient: 无法连接到任何端口");Cleanup();
+            LoggerHelper.Warning("热键 IPC 客户端无法连接到任何可用端口。");Cleanup();
             return false;
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyIpcClient: 连接失败 - {ex.GetType().Name}: {ex.Message}");
+            LoggerHelper.Warning($"热键 IPC 客户端连接失败：异常类型={ex.GetType().Name}，原因={ex.Message}");
             Cleanup();
             return false;
         }
@@ -92,7 +92,7 @@ public class HotkeyIpcClient : IDisposable
         TcpClient? tcpClient = null;
         try
         {
-            LoggerHelper.Info($"HotkeyIpcClient: 尝试连接端口 {port}...");
+            LoggerHelper.Info($"热键 IPC 客户端尝试连接端口：端口={port}");
             
             tcpClient = new TcpClient();
             tcpClient.NoDelay = true;
@@ -102,12 +102,12 @@ public class HotkeyIpcClient : IDisposable
 
             if (!tcpClient.Connected)
             {
-                LoggerHelper.Info($"HotkeyIpcClient: 端口 {port} 连接后状态为未连接");
+                LoggerHelper.Info($"热键 IPC 客户端端口连接后状态异常：端口={port}，状态=未连接");
                 tcpClient.Dispose();
                 return false;
             }
 
-            LoggerHelper.Info($"HotkeyIpcClient: TCP 连接成功，端口 {port}");
+            LoggerHelper.Info($"热键 IPC 客户端 TCP 连接成功：端口={port}");
             _tcpClient = tcpClient;
             tcpClient = null; // 防止 finally 中被释放
             _stream = _tcpClient.GetStream();
@@ -116,26 +116,26 @@ public class HotkeyIpcClient : IDisposable
 
             // 发送连接请求
             var connectMsg = HotkeyMessage.CreateConnect(ClientId);
-            LoggerHelper.Info($"HotkeyIpcClient: 发送连接请求");
+            LoggerHelper.Info("热键 IPC 客户端已发送连接请求。");
             await WriteLineAsync(connectMsg.SerializeToJson());
 
             // 等待连接确认（带超时）
-            LoggerHelper.Info($"HotkeyIpcClient: 等待连接确认...");
+            LoggerHelper.Info("热键 IPC 客户端正在等待连接确认。");
             using var readCts = new CancellationTokenSource(ConnectTimeoutMs);
             var response = await _reader.ReadLineAsync(readCts.Token);
             
             if (string.IsNullOrEmpty(response))
             {
-                LoggerHelper.Warning($"HotkeyIpcClient: 连接确认响应为空");
+                LoggerHelper.Warning("热键 IPC 客户端连接确认响应为空。");
                 CleanupConnection();
                 return false;
             }
 
-            LoggerHelper.Info($"HotkeyIpcClient: 收到响应 - {response}");
+            LoggerHelper.Info($"热键 IPC 客户端收到响应：内容={response}");
             var ack = HotkeyMessage.Deserialize(response);
             if (ack?.Type != HotkeyMessageType.ConnectAck)
             {
-                LoggerHelper.Warning($"HotkeyIpcClient: 连接确认类型错误 - {ack?.Type}");
+                LoggerHelper.Warning($"热键 IPC 客户端连接确认类型错误：类型={ack?.Type}");
                 CleanupConnection();
                 return false;
             }
@@ -147,24 +147,24 @@ public class HotkeyIpcClient : IDisposable
             _receiveTask = Task.Run(ReceiveLoopAsync);
             _heartbeatTask = Task.Run(HeartbeatLoopAsync);
 
-            LoggerHelper.Info($"HotkeyIpcClient: 已连接到主进程，端口={port}, ClientId={ClientId}");
+            LoggerHelper.Info($"热键 IPC 客户端已连接到主进程：端口={port}，客户端ID={ClientId}");
             return true;
         }
         catch (OperationCanceledException)
         {
-            LoggerHelper.Info($"HotkeyIpcClient: 连接端口 {port} 超时");
+            LoggerHelper.Info($"热键 IPC 客户端连接端口超时：端口={port}");
             tcpClient?.Dispose();
             return false;
         }
         catch (SocketException ex)
         {
-            LoggerHelper.Info($"HotkeyIpcClient: 端口 {port} 连接被拒绝 - {ex.SocketErrorCode}");
+            LoggerHelper.Info($"热键 IPC 客户端端口连接被拒绝：端口={port}，SocketError={ex.SocketErrorCode}");
             tcpClient?.Dispose();
             return false;
         }
         catch (Exception ex)
         {
-            LoggerHelper.Info($"HotkeyIpcClient: 连接端口 {port} 失败 - {ex.GetType().Name}: {ex.Message}");
+            LoggerHelper.Info($"热键 IPC 客户端连接端口失败：端口={port}，异常类型={ex.GetType().Name}，原因={ex.Message}");
             tcpClient?.Dispose();
             return false;
         }
@@ -206,18 +206,18 @@ public class HotkeyIpcClient : IDisposable
 
                 if (string.IsNullOrEmpty(line))
                 {
-                    LoggerHelper.Debug("HotkeyIpcClient: 收到空消息，连接断开");
+                    LoggerHelper.Debug("热键 IPC 客户端收到空消息，连接已断开。");
                     break;
                 }
 
-                LoggerHelper.Debug($"HotkeyIpcClient: 收到消息 - {line}");
+                LoggerHelper.Debug($"热键 IPC 客户端收到消息：{line}");
                 var msg = HotkeyMessage.Deserialize(line);
                 if (msg == null) continue;
 
                 switch (msg.Type)
                 {
                     case HotkeyMessageType.HotkeyTriggered when msg.Hotkey != null:
-                        LoggerHelper.Info($"HotkeyIpcClient: 收到热键触发 - {msg.Hotkey}");
+                        LoggerHelper.Info($"热键 IPC 客户端收到热键触发：热键={msg.Hotkey}");
                         HotkeyTriggered?.Invoke(msg.Hotkey);
                         break;
                     case HotkeyMessageType.PrimaryChanged:
@@ -225,18 +225,18 @@ public class HotkeyIpcClient : IDisposable
                         break;
                     case HotkeyMessageType.HeartbeatAck:
                         // 心跳响应，连接正常
-                        LoggerHelper.Debug("HotkeyIpcClient: 收到心跳响应");
+                        LoggerHelper.Debug("热键 IPC 客户端收到心跳响应。");
                         break;
                 }
             }
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyIpcClient: 接收异常 - {ex.Message}");
+            LoggerHelper.Warning($"热键 IPC 客户端接收循环异常：原因={ex.Message}");
         }
         finally
         {
-            LoggerHelper.Info("HotkeyIpcClient: 接收循环结束，触发断开事件");
+            LoggerHelper.Info("热键 IPC 客户端接收循环结束，准备触发断开事件。");
             Disconnected?.Invoke();
         }
     }
@@ -252,14 +252,14 @@ public class HotkeyIpcClient : IDisposable
                 {
                     var heartbeat = HotkeyMessage.CreateHeartbeat();
                     await WriteLineAsync(heartbeat.SerializeToJson());
-                    LoggerHelper.Debug("HotkeyIpcClient: 发送心跳");
+                    LoggerHelper.Debug("热键 IPC 客户端已发送心跳。");
                 }
             }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyIpcClient: 心跳异常 - {ex.Message}");
+            LoggerHelper.Warning($"热键 IPC 客户端心跳异常：原因={ex.Message}");
         }
     }
 
@@ -270,11 +270,11 @@ public class HotkeyIpcClient : IDisposable
         {
             var msg = HotkeyMessage.CreateRegister(hotkey.KeyCode, hotkey.Modifiers);
             await WriteLineAsync(msg.SerializeToJson());
-            LoggerHelper.Info($"HotkeyIpcClient: 注册热键 {hotkey}");
+            LoggerHelper.Info($"热键 IPC 客户端注册热键：热键={hotkey}");
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyIpcClient: 注册热键失败 - {ex.Message}");
+            LoggerHelper.Warning($"热键 IPC 客户端注册热键失败：原因={ex.Message}");
         }
     }
 
@@ -285,11 +285,11 @@ public class HotkeyIpcClient : IDisposable
         {
             var msg = HotkeyMessage.CreateUnregister(hotkey.KeyCode, hotkey.Modifiers);
             await WriteLineAsync(msg.SerializeToJson());
-            LoggerHelper.Info($"HotkeyIpcClient: 注销热键 {hotkey}");
+            LoggerHelper.Info($"热键 IPC 客户端注销热键：热键={hotkey}");
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"HotkeyIpcClient: 注销热键失败 - {ex.Message}");
+            LoggerHelper.Warning($"热键 IPC 客户端注销热键失败：原因={ex.Message}");
         }
     }
 

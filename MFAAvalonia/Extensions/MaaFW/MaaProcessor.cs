@@ -83,6 +83,15 @@ public class MaaProcessor
         LogItemViewModels.Clear();
     }
 
+    private IDisposable BeginInstanceLogScope(string operation, string source = "Runtime")
+    {
+        return LoggerHelper.PushContext(
+            source: source,
+            operation: operation,
+            instanceId: InstanceId,
+            instanceName: MaaProcessorManager.Instance.GetInstanceName(InstanceId));
+    }
+
     private void TrimExcessLogs()
     {
         if (LogItemViewModels.Count <= MaxLogCount) return;
@@ -340,6 +349,7 @@ public class MaaProcessor
             {
                 BackgroundColor = backGroundBrush
             });
+            using var logScope = BeginInstanceLogScope("MonitorLog", "Monitor");
             LoggerHelper.Info($"[Record] {content}");
 
             TrimExcessLogs();
@@ -365,6 +375,7 @@ public class MaaProcessor
             {
                 var log = new LogItemViewModel(key, brush, "Regular", true, "HH':'mm':'ss", changeColor: changeColor, showTime: true, transformKey: transformKey, formatArgsKeys);
                 LogItemViewModels.Add(log);
+                using var logScope = BeginInstanceLogScope("MonitorLog", "Monitor");
                 LoggerHelper.Info(log.Content);
                 TrimExcessLogs();
             });
@@ -389,6 +400,7 @@ public class MaaProcessor
                     UseMarkdown = true
                 };
                 LogItemViewModels.Add(log);
+                using var logScope = BeginInstanceLogScope("MonitorMarkdown", "Monitor");
                 LoggerHelper.Info(log.Content);
                 TrimExcessLogs();
             });
@@ -474,7 +486,7 @@ public class MaaProcessor
             }
             catch (Exception e)
             {
-                LoggerHelper.Error(e);
+                LoggerHelper.Error($"读取 interface_version 失败：file={GetInterfaceFilePath()}, reason={e.Message}", e);
             }
             _cachedIsV3 = IsV3;
         }
@@ -637,18 +649,18 @@ public class MaaProcessor
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Warning($"MaaTasker Stop inner failed: {ex.Message}");
+            LoggerHelper.Warning($"停止 MaaTasker 内部任务失败：{ex.Message}");
                     }
                 });
 
                 if (!stopTask.Wait(TimeSpan.FromSeconds(5)))
                 {
-                    LoggerHelper.Warning("MaaTasker Stop timed out after 5 seconds");
+                    LoggerHelper.Warning("停止 MaaTasker 超时：已等待 5 秒。");
                 }
             }
             catch (Exception e)
             {
-                LoggerHelper.Warning($"MaaTasker Stop failed: {e.Message}");
+                LoggerHelper.Warning($"停止 MaaTasker 失败：{e.Message}");
             }
 
             _agentStarted = false;
@@ -730,7 +742,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot tasker prewarm failed: {ex.Message}");
+            LoggerHelper.Warning($"截图任务执行器预热失败：{ex.Message}");
         }
 
         lock (_screenshotTaskerInitLock)
@@ -800,7 +812,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot tasker Stop failed: {ex.Message}");
+            LoggerHelper.Warning($"停止截图任务执行器失败：{ex.Message}");
         }
 
         try
@@ -809,7 +821,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot tasker Dispose failed: {ex.Message}");
+            LoggerHelper.Warning($"释放截图任务执行器失败：{ex.Message}");
         }
     }
 
@@ -894,7 +906,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"PostScreencap failed: {ex.Message}");
+            LoggerHelper.Warning($"提交截图任务失败：{ex.Message}");
             return MaaJobStatus.Invalid;
         }
     }
@@ -959,7 +971,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"GetImage failed: {ex.Message}");
+            LoggerHelper.Warning($"获取图像失败：{ex.Message}");
             buffer.Dispose();
             return null;
         }
@@ -999,14 +1011,14 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot controller init failed: {ex.Message}");
+            LoggerHelper.Warning($"截图控制器初始化失败：{ex.Message}");
             try
             {
                 controller?.Dispose();
             }
             catch (Exception disposeEx)
             {
-                LoggerHelper.Warning($"Screenshot controller dispose failed: {disposeEx.Message}");
+                LoggerHelper.Warning($"释放截图控制器失败：{disposeEx.Message}");
             }
             return null;
         }
@@ -1024,7 +1036,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot controller link failed: {ex.Message}");
+            LoggerHelper.Warning($"截图控制器连接失败：{ex.Message}");
             return null;
         }
     }
@@ -1072,7 +1084,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot tasker resource init failed: {ex.Message}");
+            LoggerHelper.Warning($"截图任务资源初始化失败：{ex.Message}");
             return null;
         }
 
@@ -1098,7 +1110,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot tasker controller init failed: {ex.Message}");
+            LoggerHelper.Warning($"截图任务控制器初始化失败：{ex.Message}");
             return null;
         }
 
@@ -1128,7 +1140,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Screenshot tasker init failed: {ex.Message}");
+            LoggerHelper.Warning($"截图任务执行器初始化失败：{ex.Message}");
             return null;
         }
     }
@@ -1138,7 +1150,7 @@ public class MaaProcessor
         var logDir = Path.Combine(AppPaths.LogsDirectory, "log_screencap");
         // if (!Directory.Exists(logDir))
         //     Directory.CreateDirectory(logDir);
-        LoggerHelper.Info("screenlog dir:" + logDir);
+        LoggerHelper.Info("截图日志目录：" + logDir);
         tasker.Global.SetOption_LogDir(logDir);
     }
 
@@ -1176,7 +1188,7 @@ public class MaaProcessor
                 }
             }
 
-            LoggerHelper.Info($"Resource: {string.Join(",", resources)}");
+            LoggerHelper.Info($"资源路径：{string.Join(",", resources)}");
 
 
             maaResource = await TaskManager.RunTaskAsync(() =>
@@ -1200,7 +1212,7 @@ public class MaaProcessor
         catch (OperationCanceledException)
         {
             ShouldRetry = false;
-            LoggerHelper.Warning("Resource loading was canceled");
+            LoggerHelper.Warning("资源加载已取消。");
             return (null, InvalidResource, ShouldRetry);
         }
         catch (MaaJobStatusException)
@@ -1211,7 +1223,7 @@ public class MaaProcessor
         catch (Exception e)
         {
             ShouldRetry = false;
-            LoggerHelper.Error("Initialization resource error", e);
+            LoggerHelper.Error("资源初始化失败", e);
             return (null, InvalidResource, ShouldRetry);
         }
 
@@ -1232,7 +1244,7 @@ public class MaaProcessor
 
             if (controller == null)
             {
-                LoggerHelper.Warning("Controller initialization returned null, aborting current connection attempt.");
+                LoggerHelper.Warning("控制器初始化结果为空，已中止本次连接尝试。");
                 return (null, InvalidResource, ShouldRetry);
             }
 
@@ -1249,7 +1261,7 @@ public class MaaProcessor
         }
         catch (OperationCanceledException)
         {
-            LoggerHelper.Warning("Controller initialization was canceled");
+            LoggerHelper.Warning("控制器初始化已取消。");
             return (null, InvalidResource, ShouldRetry);
         }
         catch (MaaException)
@@ -1258,7 +1270,7 @@ public class MaaProcessor
         }
         catch (Exception e)
         {
-            LoggerHelper.Error("Initialization controller error", e);
+            LoggerHelper.Error("控制器初始化失败", e);
             return (null, InvalidResource, ShouldRetry); // 控制器错误可以重试
         }
 
@@ -1282,7 +1294,7 @@ public class MaaProcessor
             var linkStatus = tasker.Controller?.LinkStart().Wait();
             if (linkStatus != MaaJobStatus.Succeeded)
             {
-                LoggerHelper.Warning($"Controller LinkStart failed with status: {linkStatus}");
+                LoggerHelper.Warning($"控制器 LinkStart 失败：状态={linkStatus}");
                 tasker.Dispose();
                 return (null, InvalidResource, ShouldRetry);
             }
@@ -1308,7 +1320,7 @@ public class MaaProcessor
             }
             catch (Exception e)
             {
-                LoggerHelper.Error(e);
+                LoggerHelper.Error($"清理临时目录失败：reason={e.Message}", e);
             }
 
             // 获取代理配置并启动 Agent（支持多 Agent）
@@ -1329,14 +1341,14 @@ public class MaaProcessor
                 }
                 catch (OperationCanceledException)
                 {
-                    LoggerHelper.Info("Agent initialization was canceled by user");
+                    LoggerHelper.Info("用户已取消 Agent 初始化。");
                     AgentHelper.KillAllAgents(_agentContexts);
                     throw;
                 }
                 catch (Exception ex)
                 {
                     AddLogByKey(LangKeys.AgentStartFailed, Brushes.OrangeRed, changeColor: false);
-                    LoggerHelper.Error(ex);
+                    LoggerHelper.Error($"启动 Agent 失败：reason={ex.Message}", ex);
                     var isNullReference = ex is NullReferenceException
                         || ex.Message.Contains("Object reference not set to an instance of an object.", StringComparison.OrdinalIgnoreCase);
                     if (isNullReference)
@@ -1354,7 +1366,7 @@ public class MaaProcessor
             tasker.Global.SetOption_SaveDraw(ConfigurationManager.Maa.GetValue(ConfigurationKeys.SaveDraw, false));
             tasker.Global.SetOption(GlobalOption.SaveOnError, ConfigurationManager.Maa.GetValue(ConfigurationKeys.SaveOnError, true));
             tasker.Global.SetOption_DebugMode(ConfigurationManager.Maa.GetValue(ConfigurationKeys.ShowHitDraw, false));
-            LoggerHelper.Info("Maafw debug mode: " + ConfigurationManager.Maa.GetValue(ConfigurationKeys.ShowHitDraw, false));
+            LoggerHelper.Info("MaaFW 调试模式：" + ConfigurationManager.Maa.GetValue(ConfigurationKeys.ShowHitDraw, false));
             // 注意：只订阅一次回调，避免嵌套订阅导致内存泄漏
             tasker.Callback += HandleCallBack;
             ResetScreencapFailureLogFlags();
@@ -1362,7 +1374,7 @@ public class MaaProcessor
         }
         catch (OperationCanceledException)
         {
-            LoggerHelper.Warning("Tasker initialization was canceled");
+            LoggerHelper.Warning("任务执行器初始化已取消。");
             return (null, InvalidResource, ShouldRetry);
         }
         catch (MaaException)
@@ -1371,7 +1383,7 @@ public class MaaProcessor
         }
         catch (Exception e)
         {
-            LoggerHelper.Error("Initialization tasker error", e);
+            LoggerHelper.Error("任务执行器初始化失败", e);
             return (null, InvalidResource, ShouldRetry);
         }
 
@@ -1443,7 +1455,7 @@ public class MaaProcessor
                         }
                         catch (Exception ex)
                         {
-                            LoggerHelper.Warning($"HandleCallBack recognition error: {ex.Message}");
+                            LoggerHelper.Warning($"处理回调识别信息时发生错误：{ex.Message}");
                             bitmapToSet?.Dispose();
                             bitmapToSet = null;
                         }
@@ -1502,7 +1514,7 @@ public class MaaProcessor
                         }
                         catch (Exception ex)
                         {
-                            LoggerHelper.Warning($"HandleCallBack action error: {ex.Message}");
+                            LoggerHelper.Warning($"处理回调动作信息时发生错误：{ex.Message}");
                             bitmapToSet?.Dispose();
                             bitmapToSet = null;
                         }
@@ -1565,7 +1577,7 @@ public class MaaProcessor
                             }
                             catch (Exception ex)
                             {
-                                LoggerHelper.Warning($"HandleCallBack focus GetRecognitionDetail error: {ex.Message}");
+                                LoggerHelper.Warning($"处理回调焦点识别详情时发生错误：{ex.Message}");
                                 focusImageBuffer?.Dispose();
                                 focusImageBuffer = null;
                             }
@@ -1585,7 +1597,7 @@ public class MaaProcessor
                 }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Warning($"HandleCallBack focus image error: {ex.Message}");
+                    LoggerHelper.Warning($"处理回调焦点图像时发生错误：{ex.Message}");
                     focusImageBuffer?.Dispose();
                     focusImageBuffer = null;
                 }
@@ -1610,7 +1622,7 @@ public class MaaProcessor
         ToastHelper.Error(message);
         if (hasWarning)
             LoggerHelper.Warning(waringMessage);
-        LoggerHelper.Error(e.ToString());
+        LoggerHelper.Error($"初始化控制器失败：message={message}, reason={e.Message}", e);
     }
 
     private void HandleInitializationError(Exception e,
@@ -1622,7 +1634,7 @@ public class MaaProcessor
         ToastHelper.Error(title, message);
         if (hasWarning)
             LoggerHelper.Warning(waringMessage);
-        LoggerHelper.Error(e.ToString());
+        LoggerHelper.Error($"初始化控制器失败：title={title}, message={message}, reason={e.Message}", e);
     }
 
     private MaaController InitializeController(MaaControllerTypes controllerType, bool logConfig)
@@ -1643,12 +1655,12 @@ public class MaaProcessor
             case MaaControllerTypes.Adb:
                 if (logConfig)
                 {
-                    LoggerHelper.Info($"Name: {Config.AdbDevice.Name}");
-                    LoggerHelper.Info($"AdbPath: {Config.AdbDevice.AdbPath}");
-                    LoggerHelper.Info($"AdbSerial: {Config.AdbDevice.AdbSerial}");
-                    LoggerHelper.Info($"ScreenCap: {Config.AdbDevice.ScreenCap}");
-                    LoggerHelper.Info($"Input: {Config.AdbDevice.Input}");
-                    LoggerHelper.Info($"Config: {Config.AdbDevice.Config}");
+                    LoggerHelper.Info($"设备名称：{Config.AdbDevice.Name}");
+                    LoggerHelper.Info($"ADB 路径：{Config.AdbDevice.AdbPath}");
+                    LoggerHelper.Info($"ADB 序列号：{Config.AdbDevice.AdbSerial}");
+                    LoggerHelper.Info($"截图模式：{Config.AdbDevice.ScreenCap}");
+                    LoggerHelper.Info($"输入模式：{Config.AdbDevice.Input}");
+                    LoggerHelper.Info($"控制器配置：{Config.AdbDevice.Config}");
                 }
 
                 return new MaaAdbController(
@@ -1662,8 +1674,8 @@ public class MaaProcessor
             case MaaControllerTypes.PlayCover:
                 if (logConfig)
                 {
-                    LoggerHelper.Info($"PlayCover Address: {Config.PlayCover.PlayCoverAddress}");
-                    LoggerHelper.Info($"PlayCover BundleId: {Config.PlayCover.UUID}");
+                    LoggerHelper.Info($"PlayCover 地址：{Config.PlayCover.PlayCoverAddress}");
+                    LoggerHelper.Info($"PlayCover BundleId：{Config.PlayCover.UUID}");
                 }
 
                 return new MaaPlayCoverController(Config.PlayCover.PlayCoverAddress, Config.PlayCover.UUID);
@@ -1672,19 +1684,19 @@ public class MaaProcessor
                 // Gamepad 控制器使用 Win32 控制器的配置，但会创建虚拟手柄
                 if (logConfig)
                 {
-                    LoggerHelper.Info($"Gamepad Controller");
-                    LoggerHelper.Info($"Name: {Config.DesktopWindow.Name}");
-                    LoggerHelper.Info($"HWnd: {Config.DesktopWindow.HWnd}");
-                    LoggerHelper.Info($"ScreenCap: {Config.DesktopWindow.ScreenCap}");
+                    LoggerHelper.Info("当前控制器类型：Gamepad");
+                    LoggerHelper.Info($"窗口名称：{Config.DesktopWindow.Name}");
+                    LoggerHelper.Info($"窗口句柄：{Config.DesktopWindow.HWnd}");
+                    LoggerHelper.Info($"截图模式：{Config.DesktopWindow.ScreenCap}");
 
                     // 获取 Gamepad 特定配置
                     var gamepadConfig = Interface?.Controller?.FirstOrDefault(c =>
                         c.Type?.Equals("gamepad", StringComparison.OrdinalIgnoreCase) == true)?.Gamepad;
                     if (gamepadConfig != null)
                     {
-                        LoggerHelper.Info($"GamepadType: {gamepadConfig.GamepadType ?? "Xbox360"}");
-                        LoggerHelper.Info($"ClassRegex: {gamepadConfig.ClassRegex}");
-                        LoggerHelper.Info($"WindowRegex: {gamepadConfig.WindowRegex}");
+                        LoggerHelper.Info($"手柄类型：{gamepadConfig.GamepadType ?? "Xbox360"}");
+                        LoggerHelper.Info($"ClassRegex：{gamepadConfig.ClassRegex}");
+                        LoggerHelper.Info($"WindowRegex：{gamepadConfig.WindowRegex}");
                     }
                 }
 
@@ -1700,13 +1712,13 @@ public class MaaProcessor
             default:
                 if (logConfig)
                 {
-                    LoggerHelper.Info($"Name: {Config.DesktopWindow.Name}");
-                    LoggerHelper.Info($"HWnd: {Config.DesktopWindow.HWnd}");
-                    LoggerHelper.Info($"ScreenCap: {Config.DesktopWindow.ScreenCap}");
-                    LoggerHelper.Info($"MouseInput: {Config.DesktopWindow.Mouse}");
-                    LoggerHelper.Info($"KeyboardInput: {Config.DesktopWindow.KeyBoard}");
-                    LoggerHelper.Info($"Link: {Config.DesktopWindow.Link}");
-                    LoggerHelper.Info($"Check: {Config.DesktopWindow.Check}");
+                    LoggerHelper.Info($"窗口名称：{Config.DesktopWindow.Name}");
+                    LoggerHelper.Info($"窗口句柄：{Config.DesktopWindow.HWnd}");
+                    LoggerHelper.Info($"截图模式：{Config.DesktopWindow.ScreenCap}");
+                    LoggerHelper.Info($"鼠标输入：{Config.DesktopWindow.Mouse}");
+                    LoggerHelper.Info($"键盘输入：{Config.DesktopWindow.KeyBoard}");
+                    LoggerHelper.Info($"连接方式：{Config.DesktopWindow.Link}");
+                    LoggerHelper.Info($"检查方式：{Config.DesktopWindow.Check}");
                 }
 
                 return new MaaWin32Controller(
@@ -1723,7 +1735,7 @@ public class MaaProcessor
         // 支持 interface.json 和 interface.jsonc
         if (GetInterfaceFilePath() == null)
         {
-            LoggerHelper.Info("未找到interface文件，生成interface.json...");
+            LoggerHelper.Info("未找到界面资源定义文件，准备生成默认 interface.json");
             Interface = new MaaInterface
             {
                 Version = "1.0",
@@ -1841,7 +1853,7 @@ public class MaaProcessor
             }
             catch (Exception e)
             {
-                LoggerHelper.Error(e);
+                LoggerHelper.Error($"加载界面资源定义失败：file={interfaceFileName}, reason={e.Message}", e);
                 // 即使解析失败也显示 Toast 错误提示（只显示一次）
                 if (!_interfaceLoadErrorShown)
                 {
@@ -1869,7 +1881,7 @@ public class MaaProcessor
 
         if (loadedPaths.Contains(fullPath))
         {
-            LoggerHelper.Warning($"Circular dependency detected: {fullPath}");
+            LoggerHelper.Warning($"检测到循环依赖：{fullPath}");
             return new MaaInterface();
         }
         loadedPaths.Add(fullPath);
@@ -1905,7 +1917,7 @@ public class MaaProcessor
                 }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Warning($"Failed to load imported interface '{resolvedPath}': {ex.Message}");
+                    LoggerHelper.Warning($"加载导入的 interface 文件失败：{resolvedPath}，原因：{ex.Message}");
                 }
             }
         }
@@ -2052,7 +2064,7 @@ public class MaaProcessor
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Warning($"Failed to create resource directory '{rp}': {ex.Message}");
+                    LoggerHelper.Warning($"创建资源目录失败：{rp}，原因：{ex.Message}");
                     }
                 }
             }
@@ -2067,7 +2079,7 @@ public class MaaProcessor
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Error(ex);
+                        LoggerHelper.Error($"创建任务管线目录失败：path={pipeline}, reason={ex.Message}", ex);
                     }
                 }
 
@@ -2093,7 +2105,7 @@ public class MaaProcessor
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Error(ex);
+                        LoggerHelper.Error($"写入默认任务管线示例失败：path={Path.Combine(pipeline, "sample.json")}, reason={ex.Message}", ex);
                     }
                 }
             }
@@ -2106,7 +2118,7 @@ public class MaaProcessor
         {
             ToastHelper.Error(LangKeys.PipelineLoadError.ToLocalizationFormatted(false, ex.Message)
             );
-            LoggerHelper.Error(ex);
+            LoggerHelper.Error($"加载任务管线失败：reason={ex.Message}", ex);
             return false;
         }
     }
@@ -2151,7 +2163,7 @@ public class MaaProcessor
     {
         if (logConfig)
         {
-            LoggerHelper.Info("Loading MAA Controller Configuration...");
+            LoggerHelper.Info("正在加载 MAA 控制器配置...");
         }
         ConfigureMaaProcessorForADB(logConfig);
         ConfigureMaaProcessorForWin32(logConfig);
@@ -2331,12 +2343,12 @@ public class MaaProcessor
         catch (Exception e)
         {
             frameworkVersion = "Unknown";
-            LoggerHelper.Error("Failed to get MaaFramework version", e);
+            LoggerHelper.Error("获取 MaaFramework 版本失败", e);
         }
 
         // Log all version information
-        LoggerHelper.Info($"Resource version: {_tempResourceVersion}");
-        LoggerHelper.Info($"MaaFramework version: {frameworkVersion}");
+        LoggerHelper.Info($"资源版本：{_tempResourceVersion}");
+        LoggerHelper.Info($"MaaFramework 版本：{frameworkVersion}");
     }
 
     #endregion
@@ -2368,6 +2380,7 @@ public class MaaProcessor
             {
                 try
                 {
+                    using var logScope = BeginInstanceLogScope("CommandLoop", "Worker");
                     command().GetAwaiter().GetResult();
                 }
                 catch (OperationCanceledException)
@@ -2375,7 +2388,7 @@ public class MaaProcessor
                 }
                 catch (Exception ex)
                 {
-                    LoggerHelper.Error(ex);
+                    LoggerHelper.Error($"停止窗口焦点监听失败：reason={ex.Message}", ex);
                 }
             }
         }
@@ -2391,7 +2404,7 @@ public class MaaProcessor
     {
         if (_commandThreadCts.IsCancellationRequested || _commandQueue.IsAddingCompleted)
         {
-            LoggerHelper.Info("Command queue stopped, ignore request.");
+            LoggerHelper.Info("命令队列已停止，已忽略本次请求。");
             return;
         }
 
@@ -2413,7 +2426,7 @@ public class MaaProcessor
             }
             catch (Exception ex)
             {
-                LoggerHelper.Warning($"Stop command thread failed: {ex.Message}");
+                LoggerHelper.Warning($"停止命令线程失败：{ex.Message}");
             }
         }
     }
@@ -2536,6 +2549,7 @@ public class MaaProcessor
 
     private Task StartInternal(List<DragItemViewModel>? dragItemViewModels, bool onlyStart, bool checkUpdate)
     {
+        using var logScope = BeginInstanceLogScope("StartTask", "Worker");
         // 保存当前的任务列表，以便在重新加载时保留用户调整的顺序和 check 状态
         var currentTasks = new Collection<DragItemViewModel>(ViewModel?.TaskItemViewModels.ToList() ?? new List<DragItemViewModel>());
 
@@ -2571,6 +2585,7 @@ public class MaaProcessor
 
     public async Task StartTask(List<DragItemViewModel>? tasks, bool onlyStart = false, bool checkUpdate = false)
     {
+        using var logScope = BeginInstanceLogScope("ExecuteTaskQueue", "Worker");
         ResetActionFailedCount();
         Interlocked.Exchange(ref _stopCompletionMessageHandled, 0);
         Status = MFATask.MFATaskStatus.NOT_STARTED;
@@ -2584,6 +2599,7 @@ public class MaaProcessor
         {
             tasks ??= new List<DragItemViewModel>();
             _tempTasks = tasks;
+            LoggerHelper.Info($"准备执行任务队列：任务数量={tasks.Count}");
             var taskAndParams = tasks.Select((task, index) => CreateNodeAndParam(task, index + 1)).ToList();
             InitializeConnectionTasksAsync(token);
             AddCoreTasksAsync(taskAndParams, token);
@@ -2883,7 +2899,7 @@ public class MaaProcessor
         //
         // var tasks = JsonConvert.DeserializeObject<Dictionary<string, MaaNode>>(json, settings);
         // tasks = tasks.MergeMaaNodes(taskModels);
-        LoggerHelper.Info($"[TaskPipelineMerge] Task#{index} Name=[{task.Name ?? task.InterfaceItem?.Name ?? "<Unnamed>"}] Entry=[{task.InterfaceItem?.Entry ?? "<Empty>"}] PipelineList={taskParams}");
+        LoggerHelper.Info($"[任务管线合并] 任务#{index} 名称=[{task.Name ?? task.InterfaceItem?.Name ?? "<未命名>"}] 入口=[{task.InterfaceItem?.Entry ?? "<空>"}] 参数={taskParams}");
         return new NodeAndParam
         {
             Index = index,
@@ -3076,11 +3092,11 @@ public class MaaProcessor
 
         if (!CanStartSoftware(out var reason))
         {
-            LoggerHelper.Warning($"Skip auto starting emulator before connect: {reason}");
+            LoggerHelper.Warning($"连接前跳过自动启动模拟器：{reason}");
             return;
         }
 
-        LoggerHelper.Info("ADB connection target is empty, trying to start emulator before first connect.");
+        LoggerHelper.Info("ADB 连接目标为空，首次连接前尝试先启动模拟器。");
         await RetryConnectionAsync(token, showMessage, StartSoftware, LangKeys.TryToStartEmulator, true, () =>
         {
             if (InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true))
@@ -3100,11 +3116,11 @@ public class MaaProcessor
 
                 if (!CanStartSoftware(out var reason))
                 {
-                    LoggerHelper.Warning($"Skip auto starting emulator after ADB connection failure: {reason}");
+                    LoggerHelper.Warning($"ADB 连接失败后跳过自动启动模拟器：{reason}");
                     return false;
                 }
 
-                LoggerHelper.Warning("ADB connection failed, trying to start emulator and refresh device target.");
+                LoggerHelper.Warning("ADB 连接失败，正在尝试启动模拟器并刷新设备目标。");
                 return await RetryConnectionAsync(t, showMessage, StartSoftware, LangKeys.TryToStartEmulator, true,
                     () => ViewModel?.TryReadAdbDeviceFromConfig(false, true));
             },
@@ -3159,7 +3175,7 @@ public class MaaProcessor
         // 如果 token 已取消，不需要再调用 Stop，因为已经在其他地方处理了
         if (token.IsCancellationRequested)
         {
-            LoggerHelper.Info("HandleConnectionFailureAsync: token is already canceled, skipping Stop call");
+            LoggerHelper.Info("处理连接失败时发现令牌已取消，跳过 Stop 调用。");
             return;
         }
         AddLogByKey(LangKeys.ConnectFailed, (IBrush?)null);
@@ -3293,13 +3309,14 @@ public class MaaProcessor
 
     private Task StopInternal(MFATask.MFATaskStatus status, bool finished, bool onlyStart, Action? action)
     {
+        using var logScope = BeginInstanceLogScope("StopTask", "Worker");
         ResetActionFailedCount();
         ClearTaskbarProgress();
         _taskQueueTotal = 0;
 
         lock (_stopLock)
         {
-            LoggerHelper.Info("Stop Status: " + Status);
+            LoggerHelper.Info("停止前状态：" + Status);
             if (Status == MFATask.MFATaskStatus.STOPPING)
                 return Task.CompletedTask;
             Status = MFATask.MFATaskStatus.STOPPING;
@@ -3336,9 +3353,9 @@ public class MaaProcessor
 
                         for (int i = 0; i < maxRetries; i++)
                         {
-                            LoggerHelper.Info($"Stopping tasker attempt {i + 1}");
+                            LoggerHelper.Info($"正在尝试停止任务执行器，第 {i + 1} 次。");
                             stopResult = AbortCurrentTasker();
-                            LoggerHelper.Info($"Stopping tasker attempt {i + 1} returned {stopResult}, retrying...");
+                            LoggerHelper.Info($"第 {i + 1} 次停止任务执行器返回：{stopResult}，准备重试。");
 
                             if (stopResult == MaaJobStatus.Succeeded)
                                 break;
@@ -3588,7 +3605,7 @@ public class MaaProcessor
 
     private void HandleStopException(Exception ex)
     {
-        LoggerHelper.Error($"Stop operation failed: {ex.Message}");
+        LoggerHelper.Error($"停止操作失败：{ex.Message}");
         ToastHelper.Error(LangKeys.StoppingFailed.ToLocalization());
     }
 
@@ -3641,13 +3658,13 @@ public class MaaProcessor
     {
         if (string.IsNullOrWhiteSpace(exePath))
         {
-            LoggerHelper.Warning("StartRunnableFile skipped because SoftwarePath is empty.");
+            LoggerHelper.Warning("已跳过启动程序，因为 SoftwarePath 为空。");
             return;
         }
 
         if (!File.Exists(exePath))
         {
-            LoggerHelper.Warning($"StartRunnableFile skipped because file does not exist: {exePath}");
+            LoggerHelper.Warning($"已跳过启动程序，因为文件不存在：{exePath}");
             return;
         }
 
@@ -3656,7 +3673,7 @@ public class MaaProcessor
             var resolved = ResolveShortcut(exePath);
             if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved))
             {
-                LoggerHelper.Info($"Resolve shortcut: {exePath} -> {resolved}");
+                LoggerHelper.Info($"快捷方式解析结果：{exePath} -> {resolved}");
                 exePath = resolved;
             }
         }
@@ -3738,14 +3755,14 @@ public class MaaProcessor
             {
                 ViewModel?.SetConnected(true);
                 AddLogByKey(LangKeys.StartupConnectSucceededDelay, (IBrush?)null, true, true, targetKey);
-                LoggerHelper.Info($"Startup connection succeeded on attempt {attempt}, waiting 5 seconds before continuing.");
+                LoggerHelper.Info($"启动后连接在第 {attempt} 次尝试时成功，继续执行前等待 5 秒。");
                 await Task.Delay(TimeSpan.FromSeconds(5), token);
                 return;
             }
 
             if (!tuple.Item3)
             {
-                LoggerHelper.Warning($"Startup connection stopped retrying after attempt {attempt} because the connection is not retryable.");
+                LoggerHelper.Warning($"启动后连接在第 {attempt} 次尝试后停止重试，因为当前错误不可重试。");
                 return;
             }
 
@@ -3754,7 +3771,7 @@ public class MaaProcessor
             {
                 AddLogByKey(LangKeys.StartupConnectRetrying, (IBrush?)null, true, true, targetKey, remainingSeconds.ToString());
             }
-            LoggerHelper.Info($"Startup connection attempt {attempt} failed, remaining retry window: {remainingSeconds}s.");
+            LoggerHelper.Info($"启动后连接第 {attempt} 次尝试失败，剩余重试窗口：{remainingSeconds} 秒。");
 
             if (DateTime.UtcNow >= deadline)
                 break;
@@ -3762,7 +3779,7 @@ public class MaaProcessor
             await Task.Delay(1000, token);
         }
         
-        LoggerHelper.Warning($"Startup connection window expired after {Math.Max(0, waitTimeInSeconds):0.#} seconds.");
+        LoggerHelper.Warning($"启动后连接等待窗口已超时：{Math.Max(0, waitTimeInSeconds):0.#} 秒。");
     }
 
     [SupportedOSPlatform("windows")]
@@ -3780,7 +3797,7 @@ public class MaaProcessor
         }
         catch (Exception ex)
         {
-            LoggerHelper.Warning($"Resolve shortcut failed: {ex.Message}");
+            LoggerHelper.Warning($"解析快捷方式失败：{ex.Message}");
         }
         return null;
     }
@@ -3822,7 +3839,7 @@ public class MaaProcessor
         {
             if (!AdminHelper.IsRunningAsAdministrator())
             {
-                LoggerHelper.Warning("控制器配置了 permission_required，但当前进程未以管理员身份运行");
+                LoggerHelper.Warning($"控制器需要管理员权限，但当前进程未提权：controller={controllerType}, permissionRequired=true");
                 DispatcherHelper.RunOnMainThread(() =>
                 {
                     Instances.DialogManager.CreateDialog()
@@ -3865,7 +3882,7 @@ public class MaaProcessor
             tasker.Resource.Register(new Custom.KillProcessAction());
             tasker.Resource.Register(new Custom.ComputerOperationAction());
             tasker.Resource.Register(new Custom.WebhookAction());
-            LoggerHelper.Info("Registered built-in special task actions");
+            LoggerHelper.Info("已注册内置特殊任务动作。");
 
             // 获取当前资源的自定义目录
             var currentResource = ViewModel?.CurrentResources
@@ -3874,7 +3891,7 @@ public class MaaProcessor
 
             if (originalPaths == null || originalPaths.Count == 0)
             {
-                LoggerHelper.Info("No resource paths found, skipping custom class loading");
+                LoggerHelper.Info("未找到资源路径，跳过自定义类加载。");
                 return;
             }
 
@@ -3889,7 +3906,7 @@ public class MaaProcessor
                 var customDir = Path.Combine(resourcePath, "custom");
                 if (!Directory.Exists(customDir))
                 {
-                    LoggerHelper.Info($"Custom directory not found: {customDir}");
+                    LoggerHelper.Info($"未找到自定义目录：{customDir}");
                     continue;
                 }
 
@@ -3906,24 +3923,24 @@ public class MaaProcessor
                         if (customClass.Value is IMaaCustomRecognition recognition)
                         {
                             tasker.Resource.Register(recognition);
-                            LoggerHelper.Info($"Registered IMaaCustomRecognition: {customClass.Name}");
+                            LoggerHelper.Info($"已注册自定义识别器：{customClass.Name}");
                         }
                         else if (customClass.Value is IMaaCustomAction action)
                         {
                             tasker.Resource.Register(action);
-                            LoggerHelper.Info($"Registered IMaaCustomAction: {customClass.Name}");
+                            LoggerHelper.Info($"已注册自定义动作：{customClass.Name}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Error($"Failed to register custom class {customClass.Name}: {ex.Message}");
+                        LoggerHelper.Error($"注册自定义类失败：{customClass.Name}，原因：{ex.Message}");
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Error during custom recognition/action registration: {ex.Message}");
+            LoggerHelper.Error($"注册自定义识别器或动作时发生错误：{ex.Message}");
         }
     }
 

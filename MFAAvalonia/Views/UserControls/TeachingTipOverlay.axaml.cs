@@ -243,7 +243,7 @@ public partial class TeachingTipOverlay : UserControl
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Failed to position teaching tip: {ex.Message}");
+            LoggerHelper.Error($"更新教学提示位置失败：原因={ex.Message}", ex);
         }
     }
 

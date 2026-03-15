@@ -11,10 +11,10 @@ public class SystemNotificationAction : IMaaCustomAction
 
     public bool Run<T>(T context, in RunArgs args, in RunResults results) where T : IMaaContext
     {
+        var title = "MFAAvalonia";
+        var message = "任务通知";
         try
         {
-            var title = "MFAAvalonia";
-            var message = "任务通知";
             if (!string.IsNullOrWhiteSpace(args.ActionParam))
             {
                 var json = ActionParamHelper.Parse(args.ActionParam);
@@ -22,13 +22,13 @@ public class SystemNotificationAction : IMaaCustomAction
                 message = (string?)json["message"] ?? message;
             }
 
-            LoggerHelper.Info($"[SystemNotificationAction] 发送通知: {title} - {message}");
+            LoggerHelper.Info($"发送系统通知：title={title}, messageLength={message.Length}");
             ToastNotification.Show(title, message);
             return true;
         }
         catch (Exception e)
         {
-            LoggerHelper.Error($"[SystemNotificationAction] Error: {e.Message}");
+            LoggerHelper.Error($"发送系统通知失败：title={title}, 原因：{e.Message}", e);
             return false;
         }
     }

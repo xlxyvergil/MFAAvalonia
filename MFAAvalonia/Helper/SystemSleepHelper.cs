@@ -31,7 +31,7 @@ public static class SystemSleepHelper
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Failed to apply prevent sleep settings: {ex.Message}");
+            LoggerHelper.Error($"应用防休眠设置失败：原因={ex.Message}", ex);
         }
     }
 
@@ -46,18 +46,18 @@ public static class SystemSleepHelper
             {
                 // Prevent system sleep, keep display on
                 SetThreadExecutionState(ExecutionState.ES_CONTINUOUS | ExecutionState.ES_SYSTEM_REQUIRED | ExecutionState.ES_DISPLAY_REQUIRED);
-                LoggerHelper.Info("System sleep prevented.");
+                LoggerHelper.Info("已启用系统防休眠。");
             }
             else
             {
                 // Allow sleep
                 SetThreadExecutionState(ExecutionState.ES_CONTINUOUS);
-                LoggerHelper.Info("System sleep allowed.");
+                LoggerHelper.Info("已恢复系统休眠。");
             }
         }
         catch (Exception ex)
         {
-            LoggerHelper.Error($"Failed to set execution state: {ex.Message}");
+            LoggerHelper.Error($"设置系统执行状态失败：原因={ex.Message}", ex);
         }
     }
 }

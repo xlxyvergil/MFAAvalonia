@@ -380,7 +380,7 @@ public static class MFAExtensions
             if (useCancel) cts.Cancel();
             cts.Dispose();
         }
-        catch (Exception e) { LoggerHelper.Error(e); }
+        catch (Exception e) { LoggerHelper.Error($"释放取消令牌源失败：原因={e.Message}", e); }
     }
 
     /// <summary>
@@ -604,7 +604,7 @@ public static class MFAExtensions
             }
             catch (Exception ex)
             {
-                LoggerHelper.Warning($"获取 URL 内容失败: {url}, 错误: {ex.Message}");
+                LoggerHelper.Warning($"获取 URL 内容失败：链接={url}，原因={ex.Message}");
                 return string.Empty;
             }
         }

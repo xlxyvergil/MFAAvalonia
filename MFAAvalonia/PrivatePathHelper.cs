@@ -52,7 +52,7 @@ public static class PrivatePathHelper
 
                             try
                             {
-                                LoggerHelper.Info($"Loaded managed assembly from libs: {assemblyPath}");
+                                LoggerHelper.Info($"已从 libs 目录加载托管程序集：{assemblyPath}");
                             }
                             catch
                             {
@@ -64,7 +64,7 @@ public static class PrivatePathHelper
                         {
                             try
                             {
-                                LoggerHelper.Warning($"Failed to resolve managed assembly '{assemblyName.FullName}': {ex.Message}");
+                                LoggerHelper.Warning($"解析托管程序集失败：{assemblyName.FullName}，原因：{ex.Message}");
                             }
                             catch
                             {
@@ -86,11 +86,11 @@ public static class PrivatePathHelper
                     try
                     {
                         AddDllDirectory(libsPath);
-                        LoggerHelper.Info($"Added DLL directory (Windows API): {libsPath}");
+                        LoggerHelper.Info($"已通过 Windows API 添加 DLL 搜索目录：{libsPath}");
                     }
                     catch (Exception ex)
                     {
-                        LoggerHelper.Warning($"Failed to add DLL directory: {ex.Message}");
+                        LoggerHelper.Warning($"添加 DLL 搜索目录失败：{ex.Message}");
                     }
                 }
 
@@ -133,7 +133,7 @@ public static class PrivatePathHelper
 
                                 try
                                 {
-                                    LoggerHelper.Info($"Loaded native library: {libraryPath}");
+                                    LoggerHelper.Info($"已加载原生库：{libraryPath}");
                                 }
                                 catch { }
 
@@ -147,7 +147,7 @@ public static class PrivatePathHelper
                         {
                             try
                             {
-                                LoggerHelper.Warning($"Failed to resolve native library '{libraryName}': {ex.Message}");
+                                LoggerHelper.Warning($"解析原生库失败：{libraryName}，原因：{ex.Message}");
                             }
                             catch { }
                             return IntPtr.Zero;
@@ -160,7 +160,7 @@ public static class PrivatePathHelper
 
             try
             {
-                LoggerHelper.Info($"Library resolver setup completed. libsPath={libsPath}, libsExists={Directory.Exists(libsPath)}");
+                LoggerHelper.Info($"库解析器初始化完成：libsPath={libsPath}，目录存在={Directory.Exists(libsPath)}");
             }
             catch { }
         }
@@ -168,7 +168,7 @@ public static class PrivatePathHelper
         {
             try
             {
-                LoggerHelper.Warning($"Failed to setup native library resolver: {ex.Message}");
+                LoggerHelper.Warning($"初始化原生库解析器失败：{ex.Message}");
             }
             catch { }
         }
@@ -361,7 +361,7 @@ public static class PrivatePathHelper
                 {
                     try
                     {
-                        LoggerHelper.Warning($"Failed to enumerate runtimes folder: {ex.Message}");
+                        LoggerHelper.Warning($"遍历 runtimes 目录失败：{ex.Message}");
                     }
                     catch { }
                 }
@@ -387,7 +387,7 @@ public static class PrivatePathHelper
                         fileInfo.Delete();
                         try
                         {
-                            LoggerHelper.Info($"Deleted duplicate library file: {fileInfo.Name} (found in libs or runtimes folder)");
+                            LoggerHelper.Info($"已删除重复库文件：{fileInfo.Name}（该文件也存在于 libs 或 runtimes 目录中）");
                         }
                         catch
                         {
@@ -399,7 +399,7 @@ public static class PrivatePathHelper
                         // 删除失败，记录错误但不中断程序
                         try
                         {
-                            LoggerHelper.Warning($"Failed to delete duplicate library file {fileInfo.Name}: {ex.Message}");
+                            LoggerHelper.Warning($"删除重复库文件失败：{fileInfo.Name}，原因：{ex.Message}");
                         }
                         catch
                         {
@@ -414,7 +414,7 @@ public static class PrivatePathHelper
             // 清理失败，记录错误但不中断程序
             try
             {
-                LoggerHelper.Warning($"Failed to cleanup duplicate libraries: {ex.Message}");
+                LoggerHelper.Warning($"清理重复库文件失败：{ex.Message}");
             }
             catch
             {
