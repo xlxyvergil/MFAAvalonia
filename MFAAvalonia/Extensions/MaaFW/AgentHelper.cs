@@ -47,6 +47,15 @@ public static class AgentHelper
 {
     private static readonly Random Random = new();
 
+    private static IDisposable PushAgentLogContext(MaaProcessor processor, string operation)
+    {
+        return LoggerHelper.PushContext(
+            source: "Agent",
+            operation: operation,
+            instanceId: processor.InstanceId,
+            instanceName: MaaProcessorManager.Instance.GetInstanceName(processor.InstanceId));
+    }
+
     /// <summary>
     /// 启动所有配置的 Agent
     /// </summary>
@@ -191,9 +200,9 @@ public static class AgentHelper
 
                 var readToken = ResetReadCancellation(ctx).Token;
                 TaskManager.RunTaskAsync(() => ReadProcessStreamAsync(ctx.Process.StandardOutput.BaseStream,
-                    line => HandleOutputLine(line, processor), readToken), token: readToken, noMessage: true);
+                    line => HandleOutputLine(line, processor, "Stdout"), readToken), token: readToken, noMessage: true);
                 TaskManager.RunTaskAsync(() => ReadProcessStreamAsync(ctx.Process.StandardError.BaseStream,
-                    line => HandleOutputLine(line, processor), readToken), token: readToken, noMessage: true);
+                    line => HandleOutputLine(line, processor, "StdErr"), readToken), token: readToken, noMessage: true);
 
                 TaskManager.RunTaskAsync(async () => await ctx.Process.WaitForExitAsync(token), token: token, name: "Agent程序启动");
             }
@@ -307,13 +316,15 @@ public static class AgentHelper
                         if (!string.IsNullOrWhiteSpace(stderr))
                         {
                             errorDetails.AppendLine($"标准错误输出：{stderr}");
-                            LoggerHelper.Error($"Agent 标准错误输出：{stderr}");
+                            using (PushAgentLogContext(processor, "StdErr"))
+                                LoggerHelper.Error(stderr);
                             processor.AddLog($"Agent Error: {stderr}", Avalonia.Media.Brushes.OrangeRed, changeColor: false);
                         }
                         if (!string.IsNullOrWhiteSpace(stdout))
                         {
                             errorDetails.AppendLine($"标准输出：{stdout}");
-                            LoggerHelper.Info($"Agent 标准输出：{stdout}");
+                            using (PushAgentLogContext(processor, "Stdout"))
+                                LoggerHelper.Info(stdout);
                         }
                         errorMessage = errorDetails.ToString();
                     }
@@ -328,12 +339,14 @@ public static class AgentHelper
                             if (!string.IsNullOrWhiteSpace(stderr))
                             {
                                 errorDetails.AppendLine($"标准错误输出：{stderr}");
-                                LoggerHelper.Error($"Agent 标准错误输出：{stderr}");
+                                using (PushAgentLogContext(processor, "StdErr"))
+                                    LoggerHelper.Error(stderr);
                                 processor.AddLog($"Agent Error: {stderr}", Avalonia.Media.Brushes.OrangeRed, changeColor: false);
                                 if (!string.IsNullOrWhiteSpace(stdout))
                                 {
                                     errorDetails.AppendLine($"标准输出：{stdout}");
-                                    LoggerHelper.Info($"Agent 标准输出：{stdout}");
+                                    using (PushAgentLogContext(processor, "Stdout"))
+                                        LoggerHelper.Info(stdout);
                                     errorMessage = errorDetails.ToString();
                                 }
                             }
@@ -499,7 +512,7 @@ public static class AgentHelper
         }
     }
 
-    private static void HandleOutputLine(string? line, MaaProcessor processor)
+    private static void HandleOutputLine(string? line, MaaProcessor processor, string streamKind)
     {
         if (string.IsNullOrEmpty(line)) return;
 
@@ -512,7 +525,10 @@ public static class AgentHelper
             if (MaaProcessor.CheckShouldLog(outData))
                 processor.AddLog(outData, (Avalonia.Media.IBrush?)null);
             else
-                LoggerHelper.Info("Agent 输出：" + outData);
+            {
+                using var _ = PushAgentLogContext(processor, streamKind);
+                LoggerHelper.Info(outData);
+            }
         });
     }
 
