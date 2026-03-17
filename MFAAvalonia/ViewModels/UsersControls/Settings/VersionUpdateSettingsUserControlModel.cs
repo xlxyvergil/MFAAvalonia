@@ -1,6 +1,7 @@
 ﻿using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia.Platform.Storage;
 using MaaFramework.Binding.Interop.Native;
 using MFAAvalonia.Configuration;
 using MFAAvalonia.Extensions;
@@ -12,11 +13,14 @@ using MFAAvalonia.ViewModels.Windows;
 using System;
 using System.Collections.ObjectModel;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace MFAAvalonia.ViewModels.UsersControls.Settings;
 
 public partial class VersionUpdateSettingsUserControlModel : ViewModelBase
 {
+    [ObservableProperty] private bool _showLocalPackageUpdate;
+
     public enum UpdateProxyType
     {
         Http,
@@ -35,8 +39,29 @@ public partial class VersionUpdateSettingsUserControlModel : ViewModelBase
             LoggerHelper.Error($"读取 MaaFramework 版本失败，已回退默认值：原因={e.Message}", e);
         }
         LanguageHelper.LanguageChanged += (_, _) => UpdateCdkExpireDisplay();
+        ConfigurationManager.ConfigurationSwitched += OnConfigurationSwitched;
+        RefreshDebugActionsVisibility();
         StopCountdownTimer();
         base.Initialize();
+    }
+
+    private void OnConfigurationSwitched(string _)
+    {
+        RefreshDebugActionsVisibility();
+    }
+
+    public void RefreshDebugActionsVisibility()
+    {
+        if (ConfigurationManager.Current.TryGetValue<bool>("Debug", out var debugValue))
+        {
+            ShowLocalPackageUpdate = debugValue;
+            LoggerHelper.Info($"本地更新包按钮可见性已刷新：来源=config.Debug(bool)，值={debugValue}");
+            return;
+        }
+
+        var rawValue = ConfigurationManager.Current.GetValue("Debug", string.Empty);
+        ShowLocalPackageUpdate = bool.TryParse(rawValue, out var parsed) && parsed;
+        LoggerHelper.Info($"本地更新包按钮可见性已刷新：来源=config.Debug(string)，原始值={rawValue}，解析结果={ShowLocalPackageUpdate}");
     }
 
     [ObservableProperty] private string _maaFwVersion = "";
@@ -262,6 +287,35 @@ public partial class VersionUpdateSettingsUserControlModel : ViewModelBase
     private void RedownloadResource()
     {
         VersionChecker.UpdateResourceAsync("v0.0.0");
+    }
+
+    [RelayCommand]
+    private async Task UpdateResourceFromLocalPackage()
+    {
+        var storageProvider = Instances.StorageProvider;
+        if (storageProvider == null)
+        {
+            ToastHelper.Warn(LangKeys.Warning.ToLocalization(), LangKeys.PlatformNotSupportedOperation.ToLocalization());
+            return;
+        }
+
+        var result = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "选择本地更新包",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Archive")
+                {
+                    Patterns = ["*.zip", "*.7z", "*.tar", "*.gz", "*.tgz", "*.tar.gz"]
+                }
+            ]
+        });
+
+        if (result is { Count: > 0 } && result[0].TryGetLocalPath() is { } path)
+        {
+            VersionChecker.UpdateResourceFromLocalPackageAsync(path);
+        }
     }
 
     [RelayCommand]

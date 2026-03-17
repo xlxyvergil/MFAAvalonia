@@ -9,24 +9,37 @@ public static class AppPaths
     private const string AppFolderName = "MFAAvalonia";
     private const string MigrationMarkerFileName = ".data_root_initialized";
     private static bool _initialized;
+    private static string _configDirectory = string.Empty;
+    private static string _logsDirectory = string.Empty;
+    private static string _tempDirectory = string.Empty;
 
     public static string InstallRoot => AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     public static string DataRoot { get; private set; } = InstallRoot;
-    public static string ConfigDirectory => Path.Combine(DataRoot, "config");
+    public static string ConfigDirectory => string.IsNullOrWhiteSpace(_configDirectory)
+        ? Path.Combine(InstallRoot, "config")
+        : _configDirectory;
     public static string InstancesDirectory => Path.Combine(ConfigDirectory, "instances");
     public static string ResourceDirectory => Path.Combine(DataRoot, "resource");
     public static string AgentDirectory => Path.Combine(DataRoot, "agent");
-    public static string LogsDirectory => Path.Combine(DataRoot, "logs");
-    public static string TempDirectory => Path.Combine(DataRoot, "temp");
+    public static string LogsDirectory => string.IsNullOrWhiteSpace(_logsDirectory)
+        ? Path.Combine(InstallRoot, "logs")
+        : _logsDirectory;
+    public static string TempDirectory => string.IsNullOrWhiteSpace(_tempDirectory)
+        ? Path.Combine(InstallRoot, "temp")
+        : _tempDirectory;
     public static string TempResourceDirectory => Path.Combine(TempDirectory, "temp_res");
     public static string TempMfaDirectory => Path.Combine(TempDirectory, "temp_mfa");
     public static string TempMaaFwDirectory => Path.Combine(TempDirectory, "temp_maafw");
     public static string InterfaceJsonPath => Path.Combine(DataRoot, "interface.json");
     public static string InterfaceJsoncPath => Path.Combine(DataRoot, "interface.jsonc");
-    public static string GlobalConfigPath => Path.Combine(DataRoot, "appsettings.json");
+    public static string GlobalConfigPath => Path.Combine(Path.GetDirectoryName(ConfigDirectory) ?? InstallRoot, "appsettings.json");
     public static string ChangesPath => Path.Combine(DataRoot, "changes.json");
     public static string BackupDirectory => Path.Combine(DataRoot, "backup");
     public static bool IsUsingIndependentDataRoot => !string.Equals(DataRoot, InstallRoot, StringComparison.OrdinalIgnoreCase);
+    public static bool IsUsingLocalConfigDirectory => string.Equals(
+        ConfigDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+        Path.Combine(InstallRoot, "config").TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+        StringComparison.OrdinalIgnoreCase);
 
     public static void Initialize()
     {
@@ -40,6 +53,9 @@ public static class AppPaths
 
         DataRoot = candidateRoot;
         Directory.CreateDirectory(DataRoot);
+        _configDirectory = ResolveConfigDirectory();
+        _logsDirectory = ResolveLogsDirectory();
+        _tempDirectory = ResolveTempDirectory();
 
         if (!File.Exists(GetMarkerPath()))
         {
@@ -62,19 +78,71 @@ public static class AppPaths
 
     private static string GetMarkerPath() => Path.Combine(DataRoot, MigrationMarkerFileName);
 
+    private static string ResolveConfigDirectory()
+    {
+        var installConfig = Path.Combine(InstallRoot, "config");
+        if (CanUseDirectory(installConfig))
+            return installConfig;
+
+        return Path.Combine(DataRoot, "config");
+    }
+
+    private static string ResolveLogsDirectory()
+    {
+        var installLogs = Path.Combine(InstallRoot, "logs");
+        if (CanUseDirectory(installLogs))
+            return installLogs;
+
+        return Path.Combine(DataRoot, "logs");
+    }
+
+    private static string ResolveTempDirectory()
+    {
+        var installTemp = Path.Combine(InstallRoot, "temp");
+        if (CanUseDirectory(installTemp))
+            return installTemp;
+
+        return Path.Combine(DataRoot, "temp");
+    }
+
+    private static bool CanUseDirectory(string path)
+    {
+        try
+        {
+            Directory.CreateDirectory(path);
+            var probePath = Path.Combine(path, ".write_probe");
+            File.WriteAllText(probePath, DateTime.UtcNow.ToString("O"));
+            File.Delete(probePath);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static void MigrateLegacyDataIfNeeded()
     {
         if (string.Equals(DataRoot, InstallRoot, StringComparison.OrdinalIgnoreCase))
             return;
 
-        CopyDirectoryIfExists(Path.Combine(InstallRoot, "config"), ConfigDirectory);
+        var installConfigDirectory = Path.Combine(InstallRoot, "config");
+        var dataConfigDirectory = Path.Combine(DataRoot, "config");
+        if (!string.Equals(ConfigDirectory, installConfigDirectory, StringComparison.OrdinalIgnoreCase))
+            CopyDirectoryIfExists(installConfigDirectory, ConfigDirectory);
+        else
+            CopyDirectoryIfExists(dataConfigDirectory, ConfigDirectory);
+
         CopyDirectoryIfExists(Path.Combine(InstallRoot, "resource"), ResourceDirectory);
         CopyDirectoryIfExists(Path.Combine(InstallRoot, "agent"), AgentDirectory);
         CopyDirectoryIfExists(Path.Combine(InstallRoot, "logs"), LogsDirectory);
 
         CopyFileIfExists(Path.Combine(InstallRoot, "interface.json"), InterfaceJsonPath);
         CopyFileIfExists(Path.Combine(InstallRoot, "interface.jsonc"), InterfaceJsoncPath);
-        CopyFileIfExists(Path.Combine(InstallRoot, "appsettings.json"), GlobalConfigPath);
+        if (!string.Equals(GlobalConfigPath, Path.Combine(InstallRoot, "appsettings.json"), StringComparison.OrdinalIgnoreCase))
+            CopyFileIfExists(Path.Combine(InstallRoot, "appsettings.json"), GlobalConfigPath);
+        else
+            CopyFileIfExists(Path.Combine(DataRoot, "appsettings.json"), GlobalConfigPath);
         CopyFileIfExists(Path.Combine(InstallRoot, "changes.json"), ChangesPath);
     }
 
@@ -119,6 +187,9 @@ public static class AppPaths
             LoggerHelper.Info($"应用安装目录：{InstallRoot}");
             LoggerHelper.Info($"应用数据目录：{DataRoot}");
             LoggerHelper.Info($"是否使用独立数据目录：{IsUsingIndependentDataRoot}");
+            LoggerHelper.Info($"配置目录：{ConfigDirectory}");
+            LoggerHelper.Info($"是否使用本地配置目录：{IsUsingLocalConfigDirectory}");
+            LoggerHelper.Info($"日志目录：{LogsDirectory}");
 
             var backupCount = Directory.Exists(DataRoot)
                 ? Directory.EnumerateFiles(DataRoot, "*.backupMFA", SearchOption.AllDirectories).Count()
@@ -130,6 +201,33 @@ public static class AppPaths
         catch
         {
             // Avoid breaking startup for diagnostics.
+        }
+    }
+
+    public static void CleanupObsoleteExecutableBackups(Action<string>? logInfo = null, Action<string>? logWarning = null)
+    {
+        try
+        {
+            if (!Directory.Exists(InstallRoot))
+                return;
+
+            foreach (var backupFile in Directory.EnumerateFiles(InstallRoot, "*.backupMFA", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    File.SetAttributes(backupFile, FileAttributes.Normal);
+                    File.Delete(backupFile);
+                    logInfo?.Invoke($"已清理 backupMFA 文件：文件={backupFile}");
+                }
+                catch (Exception ex)
+                {
+                    logWarning?.Invoke($"清理 backupMFA 文件失败：文件={backupFile}，原因={ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logWarning?.Invoke($"处理旧主程序 backupMFA 清理失败：原因={ex.Message}");
         }
     }
 }

@@ -6,6 +6,7 @@ using AvaloniaExtensions.Axaml.Markup;
 using Lang.Avalonia.MarkupExtensions;
 using MFAAvalonia.Extensions;
 using MFAAvalonia.Helper;
+using System;
 using System.Threading.Tasks;
 
 
@@ -15,8 +16,23 @@ public partial class VersionUpdateSettingsUserControl : UserControl
 {
     public VersionUpdateSettingsUserControl()
     {
-        DataContext = Instances.VersionUpdateSettingsUserControlModel;
         InitializeComponent();
+        DataContext = Instances.VersionUpdateSettingsUserControlModel;
+        Instances.VersionUpdateSettingsUserControlModel.RefreshDebugActionsVisibility();
+        ApplyDebugVisibility();
+    }
+
+    private void ApplyDebugVisibility()
+    {
+        try
+        {
+            DebugLocalPackageCard.IsVisible = Instances.VersionUpdateSettingsUserControlModel.ShowLocalPackageUpdate;
+            LoggerHelper.Info($"设置页调试卡片可见性已应用：{DebugLocalPackageCard.IsVisible}");
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"设置页调试卡片可见性应用失败：{ex.Message}");
+        }
     }
 
     private void CopyVersion(object? sender, PointerPressedEventArgs e)

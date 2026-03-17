@@ -70,6 +70,9 @@ public partial class App : Application
             base.Initialize();
             AppPaths.Initialize();
             LoggerHelper.InitializeLogger();
+            AppPaths.CleanupObsoleteExecutableBackups(
+                message => LoggerHelper.Info(message),
+                message => LoggerHelper.Warning(message));
             AvaloniaXamlLoader.Load(this);
             LanguageHelper.Initialize();
             ConfigurationManager.Initialize();
