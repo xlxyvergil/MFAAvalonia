@@ -383,6 +383,14 @@ public partial class InstanceTabBarViewModel : ViewModelBase
             LoggerHelper.Info("实例切换完成");
             // ReloadConfigurationForSwitch(false) 会刷新实例级配置（ConnectSettings 等），无需重复调用 SyncConnectSettingsForCurrentInstance
             Instances.ReloadConfigurationForSwitch(false);
+            DispatcherHelper.PostOnMainThread(() =>
+            {
+                var taskViewModel = ActiveTab?.TaskQueueViewModel;
+                if (taskViewModel == null) return;
+
+                taskViewModel.InitializeControllerOptions();
+                taskViewModel.UpdateResourcesForController(taskViewModel.CurrentResource);
+            });
         }
     }
 
@@ -392,11 +400,11 @@ public partial class InstanceTabBarViewModel : ViewModelBase
     /// </summary>
     private static void SyncConnectSettingsForCurrentInstance()
     {
-        if (!Instances.IsResolved<MFAAvalonia.ViewModels.UsersControls.Settings.ConnectSettingsUserControlModel>())
+        if (!Instances.IsResolved<ConnectSettingsUserControlModel>())
             return;
 
         var connect = Instances.ConnectSettingsUserControlModel;
-        var config = MFAAvalonia.Configuration.ConfigurationManager.CurrentInstance;
+        var config = ConfigurationManager.CurrentInstance;
 
         connect.IsSyncing = true;
         try

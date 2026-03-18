@@ -35,6 +35,7 @@ namespace MFAAvalonia.ViewModels.Pages;
 public partial class TaskQueueViewModel : ViewModelBase
 {
     private readonly MaaProcessor _processorField;
+    private string? _savedControllerName;
     public MaaProcessor Processor => _processorField;
 
     public TaskQueueViewModel() : this(MaaProcessorManager.Instance.Current.InstanceId)
@@ -45,6 +46,7 @@ public partial class TaskQueueViewModel : ViewModelBase
     {
         _processorField = new MaaProcessor(instanceId);
         _currentController = _processorField.InstanceConfiguration.GetValue(ConfigurationKeys.CurrentController, MaaControllerTypes.Adb, MaaControllerTypes.None, new UniversalEnumConverter<MaaControllerTypes>());
+        _savedControllerName = _processorField.InstanceConfiguration.GetValue(ConfigurationKeys.CurrentControllerName, string.Empty);
         // 初始化为当前控制器类型，避免首次 AutoDetectDevice 时用 interface.json 覆盖用户已保存的配置
         _lastAppliedControllerSettingsType = _currentController;
         // 提前从配置读取资源，避免 Initialize() 中 UpdateResourcesForController 以空字符串调用时
@@ -184,7 +186,12 @@ public partial class TaskQueueViewModel : ViewModelBase
 
     partial void OnSelectedControllerChanged(MaaInterface.MaaResourceController? value)
     {
-        if (value != null && value.ControllerType != CurrentController)
+        if (value == null) return;
+
+        _savedControllerName = value.Name;
+        Processor.InstanceConfiguration.SetValue(ConfigurationKeys.CurrentControllerName, value.Name ?? string.Empty);
+
+        if (value.ControllerType != CurrentController)
         {
             CurrentController = value.ControllerType;
         }
@@ -195,7 +202,7 @@ public partial class TaskQueueViewModel : ViewModelBase
     /// </summary>
     public string? GetCurrentControllerName()
     {
-        return TaskLoader.GetControllerName(CurrentController, MaaProcessor.Interface);
+        return SelectedController?.Name ?? _savedControllerName ?? TaskLoader.GetControllerName(CurrentController, MaaProcessor.Interface);
     }
 
     public void UpdateResourcesForController(string? targetResource = null)
@@ -205,7 +212,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             if (MaaProcessor.Interface == null)
             {
                 LoggerHelper.Warning("界面资源接口尚未初始化完成。");
-                CurrentResources = [];
+                DispatcherHelper.RunOnMainThread(() => CurrentResources = []);
                 return;
             }
 
@@ -232,16 +239,21 @@ public partial class TaskQueueViewModel : ViewModelBase
             }
 
             var resourceToSelect = targetResource ?? CurrentResource;
-            CurrentResources = new ObservableCollection<MaaInterface.MaaInterfaceResource>(filteredResources);
+            var nextResources = new ObservableCollection<MaaInterface.MaaInterfaceResource>(filteredResources);
 
-            if (!string.IsNullOrWhiteSpace(resourceToSelect) && CurrentResources.Any(r => r.Name == resourceToSelect))
+            DispatcherHelper.RunOnMainThread(() =>
             {
-                CurrentResource = resourceToSelect;
-            }
-            else
-            {
-                CurrentResource = CurrentResources.FirstOrDefault()?.Name ?? "Default";
-            }
+                CurrentResources = nextResources;
+
+                if (!string.IsNullOrWhiteSpace(resourceToSelect) && CurrentResources.Any(r => r.Name == resourceToSelect))
+                {
+                    CurrentResource = resourceToSelect;
+                }
+                else
+                {
+                    CurrentResource = CurrentResources.FirstOrDefault()?.Name ?? "Default";
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -258,6 +270,7 @@ public partial class TaskQueueViewModel : ViewModelBase
     {
         try
         {
+            ObservableCollection<MaaInterface.MaaResourceController> nextControllerOptions;
             var controllers = MaaProcessor.Interface?.Controller;
             if (controllers is { Count: > 0 })
             {
@@ -272,28 +285,27 @@ public partial class TaskQueueViewModel : ViewModelBase
                     {
                         controller.InitializeDisplayName();
                     }
-                    ControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(filteredControllers);
+                    nextControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(filteredControllers);
                 }
                 else
                 {
                     // 过滤后为空则使用默认控制器
                     var defaultControllers = CreateDefaultControllers();
-                    ControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(defaultControllers);
+                    nextControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(defaultControllers);
                 }
             }
             else
             {
                 // 使用默认的Adb和Win32控制器
                 var defaultControllers = CreateDefaultControllers();
-                ControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(defaultControllers);
+                nextControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(defaultControllers);
             }
 
-            // 根据当前控制器类型选择对应的控制器
-            // 使用 PostOnMainThread 延迟设置 SelectedController，确保 ComboBox 已完成 ItemsSource 更新
-            var targetController = ControllerOptions.FirstOrDefault(c => c.ControllerType == CurrentController)
-                ?? ControllerOptions.FirstOrDefault();
-            DispatcherHelper.PostOnMainThread(() =>
+            DispatcherHelper.RunOnMainThread(() =>
             {
+                ControllerOptions = nextControllerOptions;
+
+                var targetController = ResolveTargetController(CurrentController);
                 SelectedController = targetController;
                 _isSyncing = false;
             });
@@ -303,9 +315,9 @@ public partial class TaskQueueViewModel : ViewModelBase
             LoggerHelper.Error($"初始化控制器选项失败：控制器={CurrentController}，原因={e.Message}", e);
             // 出错时使用默认控制器
             var defaultControllers = CreateDefaultControllers();
-            ControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(defaultControllers);
-            DispatcherHelper.PostOnMainThread(() =>
+            DispatcherHelper.RunOnMainThread(() =>
             {
+                ControllerOptions = new ObservableCollection<MaaInterface.MaaResourceController>(defaultControllers);
                 SelectedController = ControllerOptions.FirstOrDefault();
                 _isSyncing = false;
             });
@@ -1190,6 +1202,8 @@ public partial class TaskQueueViewModel : ViewModelBase
     partial void OnCurrentControllerChanged(MaaControllerTypes value)
     {
         if (_isSyncing) return;
+        SyncSelectedControllerToCurrentController(value);
+        _savedControllerName = SelectedController?.Name ?? _savedControllerName;
         using var _ = BeginUiLogScope("ChangeController");
         LoggerHelper.UserAction("切换控制器",
             $"controller={value}, resource={CurrentResource}",
@@ -1197,6 +1211,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             instanceId: Processor.InstanceId,
             instanceName: InstanceName);
         Processor.InstanceConfiguration.SetValue(ConfigurationKeys.CurrentController, value.ToString());
+        Processor.InstanceConfiguration.SetValue(ConfigurationKeys.CurrentControllerName, _savedControllerName ?? string.Empty);
         if (Instances.IsResolved<ConnectSettingsUserControlModel>())
             Instances.ConnectSettingsUserControlModel.CurrentControllerType = value;
         UpdateResourcesForController(CurrentResource);
@@ -1223,6 +1238,41 @@ public partial class TaskQueueViewModel : ViewModelBase
         {
             Refresh();
         }
+    }
+
+    private void SyncSelectedControllerToCurrentController(MaaControllerTypes controllerType)
+    {
+        if (ControllerOptions.Count == 0) return;
+
+        var targetController = ResolveTargetController(controllerType);
+        if (ReferenceEquals(SelectedController, targetController)) return;
+
+        _isSyncing = true;
+        try
+        {
+            DispatcherHelper.RunOnMainThread(() => SelectedController = targetController);
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
+
+    private MaaInterface.MaaResourceController? ResolveTargetController(MaaControllerTypes controllerType)
+    {
+        if (!string.IsNullOrWhiteSpace(_savedControllerName))
+        {
+            var exactMatch = ControllerOptions.FirstOrDefault(c =>
+                !string.IsNullOrWhiteSpace(c.Name)
+                && c.Name.Equals(_savedControllerName, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null)
+            {
+                return exactMatch;
+            }
+        }
+
+        return ControllerOptions.FirstOrDefault(c => c.ControllerType == controllerType)
+            ?? ControllerOptions.FirstOrDefault();
     }
 
     [RelayCommand]

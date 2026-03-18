@@ -1140,6 +1140,34 @@ public sealed class MaaProcessorManager
     }
 
     /// <summary>
+    /// 在懒加载阶段后台恢复实例已保存的连接目标，避免首次点进页签时才补恢复。
+    /// </summary>
+    private static void WarmupConnectionSelection(MaaProcessor? processor)
+    {
+        var vm = processor?.ViewModel;
+        if (vm == null)
+            return;
+
+        if (vm.CurrentController == MaaControllerTypes.PlayCover)
+        {
+            DispatcherHelper.PostOnMainThread(vm.TryReadPlayCoverConfig);
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                vm.TryReadAdbDeviceFromConfig(inTask: false, refresh: false, allowAutoDetect: true);
+            }
+            catch (Exception ex)
+            {
+                LoggerHelper.Warning($"[懒加载] 预热实例连接目标失败：实例={processor?.InstanceId}，原因={ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
     /// 懒加载第二阶段：加载当天有定时任务的实例
     /// </summary>
     public void LoadScheduledInstances()
@@ -1166,6 +1194,10 @@ public sealed class MaaProcessorManager
                 if (scheduledInstanceIds.Contains(id))
                 {
                     LoadSingleInstance(id);
+                    if (_instances.TryGetValue(id, out var processor))
+                    {
+                        WarmupConnectionSelection(processor);
+                    }
                     loaded.Add(id);
                 }
             }
@@ -1218,6 +1250,8 @@ public sealed class MaaProcessorManager
                     processor.ViewModel.ApplyPresetCommand.Execute(preset);
                 });
             }
+
+            WarmupConnectionSelection(processor);
 
             // 每加载一个实例后等待0.5秒，缓慢加载避免卡UI
             await Task.Delay(500);

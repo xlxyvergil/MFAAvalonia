@@ -69,6 +69,7 @@ public static class ConfigurationKeys
     public const string DesktopWindowName = "DesktopWindowName";
     public const string PlayCoverConfig = "PlayCoverConfig";
     public const string CurrentController = "CurrentController";
+    public const string CurrentControllerName = "CurrentControllerName";
 
     #endregion
 
@@ -220,6 +221,7 @@ public static class ConfigurationKeys
         DesktopWindowName,
         PlayCoverConfig,
         CurrentController,
+        CurrentControllerName,
         Resource,
         EnableLiveView,
         LiveViewRefreshRate,
