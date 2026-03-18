@@ -6,8 +6,6 @@ namespace MFAAvalonia.Helper;
 
 public static class AppPaths
 {
-    private const string AppFolderName = "MFAAvalonia";
-    private const string MigrationMarkerFileName = ".data_root_initialized";
     private static bool _initialized;
     private static string _configDirectory = string.Empty;
     private static string _logsDirectory = string.Empty;
@@ -46,22 +44,10 @@ public static class AppPaths
         if (_initialized)
             return;
 
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var candidateRoot = string.IsNullOrWhiteSpace(localAppData)
-            ? InstallRoot
-            : Path.Combine(localAppData, AppFolderName);
-
-        DataRoot = candidateRoot;
-        Directory.CreateDirectory(DataRoot);
+        DataRoot = InstallRoot;
         _configDirectory = ResolveConfigDirectory();
         _logsDirectory = ResolveLogsDirectory();
         _tempDirectory = ResolveTempDirectory();
-
-        if (!File.Exists(GetMarkerPath()))
-        {
-            MigrateLegacyDataIfNeeded();
-            File.WriteAllText(GetMarkerPath(), DateTime.UtcNow.ToString("O"));
-        }
 
         Directory.CreateDirectory(ConfigDirectory);
         Directory.CreateDirectory(InstancesDirectory);
@@ -76,15 +62,13 @@ public static class AppPaths
         _initialized = true;
     }
 
-    private static string GetMarkerPath() => Path.Combine(DataRoot, MigrationMarkerFileName);
-
     private static string ResolveConfigDirectory()
     {
         var installConfig = Path.Combine(InstallRoot, "config");
         if (CanUseDirectory(installConfig))
             return installConfig;
 
-        return Path.Combine(DataRoot, "config");
+        return installConfig;
     }
 
     private static string ResolveLogsDirectory()
@@ -93,7 +77,7 @@ public static class AppPaths
         if (CanUseDirectory(installLogs))
             return installLogs;
 
-        return Path.Combine(DataRoot, "logs");
+        return installLogs;
     }
 
     private static string ResolveTempDirectory()
@@ -102,7 +86,7 @@ public static class AppPaths
         if (CanUseDirectory(installTemp))
             return installTemp;
 
-        return Path.Combine(DataRoot, "temp");
+        return installTemp;
     }
 
     private static bool CanUseDirectory(string path)
@@ -119,65 +103,6 @@ public static class AppPaths
         {
             return false;
         }
-    }
-
-    private static void MigrateLegacyDataIfNeeded()
-    {
-        if (string.Equals(DataRoot, InstallRoot, StringComparison.OrdinalIgnoreCase))
-            return;
-
-        var installConfigDirectory = Path.Combine(InstallRoot, "config");
-        var dataConfigDirectory = Path.Combine(DataRoot, "config");
-        if (!string.Equals(ConfigDirectory, installConfigDirectory, StringComparison.OrdinalIgnoreCase))
-            CopyDirectoryIfExists(installConfigDirectory, ConfigDirectory);
-        else
-            CopyDirectoryIfExists(dataConfigDirectory, ConfigDirectory);
-
-        CopyDirectoryIfExists(Path.Combine(InstallRoot, "resource"), ResourceDirectory);
-        CopyDirectoryIfExists(Path.Combine(InstallRoot, "agent"), AgentDirectory);
-        CopyDirectoryIfExists(Path.Combine(InstallRoot, "logs"), LogsDirectory);
-
-        CopyFileIfExists(Path.Combine(InstallRoot, "interface.json"), InterfaceJsonPath);
-        CopyFileIfExists(Path.Combine(InstallRoot, "interface.jsonc"), InterfaceJsoncPath);
-        if (!string.Equals(GlobalConfigPath, Path.Combine(InstallRoot, "appsettings.json"), StringComparison.OrdinalIgnoreCase))
-            CopyFileIfExists(Path.Combine(InstallRoot, "appsettings.json"), GlobalConfigPath);
-        else
-            CopyFileIfExists(Path.Combine(DataRoot, "appsettings.json"), GlobalConfigPath);
-        CopyFileIfExists(Path.Combine(InstallRoot, "changes.json"), ChangesPath);
-    }
-
-    private static void CopyDirectoryIfExists(string source, string destination)
-    {
-        if (!Directory.Exists(source))
-            return;
-
-        foreach (var directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(source, directory);
-            Directory.CreateDirectory(Path.Combine(destination, relativePath));
-        }
-
-        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(source, file);
-            var targetFile = Path.Combine(destination, relativePath);
-            var targetDir = Path.GetDirectoryName(targetFile);
-            if (!string.IsNullOrWhiteSpace(targetDir))
-                Directory.CreateDirectory(targetDir);
-            if (!File.Exists(targetFile))
-                File.Copy(file, targetFile, false);
-        }
-    }
-
-    private static void CopyFileIfExists(string source, string destination)
-    {
-        if (!File.Exists(source) || File.Exists(destination))
-            return;
-
-        var targetDir = Path.GetDirectoryName(destination);
-        if (!string.IsNullOrWhiteSpace(targetDir))
-            Directory.CreateDirectory(targetDir);
-        File.Copy(source, destination, false);
     }
 
     private static void LogInitializationStatus()
