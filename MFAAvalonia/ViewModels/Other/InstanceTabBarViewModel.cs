@@ -332,7 +332,11 @@ public partial class InstanceTabBarViewModel : ViewModelBase
 
     partial void OnActiveTabChanged(InstanceTabViewModel? oldValue, InstanceTabViewModel? newValue)
     {
-        if (oldValue != null) oldValue.IsActive = false;
+        if (oldValue != null)
+        {
+            oldValue.IsActive = false;
+            oldValue.TaskQueueViewModel?.PauseLiveView();
+        }
 
         if (newValue == null)
         {
@@ -351,6 +355,7 @@ public partial class InstanceTabBarViewModel : ViewModelBase
         if (newValue != null)
         {
             newValue.IsActive = true;
+            newValue.TaskQueueViewModel?.ResumeLiveView();
             // 排序期间 Tabs.Move 可能导致 SelectedItem 变化触发此回调，跳过副作用
             if (_isReloading) return;
             if (MaaProcessorManager.Instance.Current != newValue.Processor)

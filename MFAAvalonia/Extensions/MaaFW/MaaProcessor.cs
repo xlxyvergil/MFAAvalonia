@@ -766,6 +766,11 @@ public class MaaProcessor
             return MaaTasker;
         }
 
+        if (ShouldRecreateScreenshotTasker())
+        {
+            DisposeScreenshotTasker();
+        }
+
         if (_screenshotTasker == null && !_isClosed)
         {
             Task<MaaTasker?> initTask;
@@ -789,6 +794,35 @@ public class MaaProcessor
         }
 
         return _screenshotTasker;
+    }
+
+    private bool ShouldRecreateScreenshotTasker()
+    {
+        var screenshotTasker = _screenshotTasker;
+        if (screenshotTasker == null)
+            return false;
+
+        try
+        {
+            var controller = screenshotTasker.Controller;
+            if (controller == null)
+                return true;
+
+            // 主任务仍然在线时，独立截图 tasker 断连说明实时视图链路已经单独失效，需要重建。
+            if (MaaTasker?.Controller?.IsConnected == true && !controller.IsConnected)
+                return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"检查截图任务执行器状态失败：{ex.Message}");
+            return true;
+        }
+
+        return false;
     }
 
     private void DisposeScreenshotTasker()

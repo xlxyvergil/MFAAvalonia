@@ -2597,6 +2597,20 @@ public partial class TaskQueueViewModel : ViewModelBase
         IsLiveViewExpanded = !IsLiveViewExpanded;
     }
 
+    public void PauseLiveView()
+    {
+        _liveViewTimer.Stop();
+    }
+
+    public void ResumeLiveView()
+    {
+        if (Processor.IsClosed)
+            return;
+
+        UpdateLiveViewTimerInterval();
+        _liveViewTimer.Start();
+    }
+
     /// <summary>
     /// 更新当前任务名称
     /// </summary>
