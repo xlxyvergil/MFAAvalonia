@@ -876,6 +876,7 @@ public class MaaProcessor
     private bool _screencapDisconnectedLogPending;
     private bool _screencapFailureLogged;
     private int _isConnecting;
+    private bool _suppressConnectionAttemptErrorToast;
     public bool IsConnecting => _isConnecting != 0;
 
     private MaaController? GetScreenshotController(bool test)
@@ -1274,7 +1275,8 @@ public class MaaProcessor
                     .FormatWith((ViewModel?.CurrentController ?? MaaControllerTypes.Adb) == MaaControllerTypes.Adb
                         ? LangKeys.Emulator.ToLocalization()
                         : LangKeys.Window.ToLocalization()), true,
-                LangKeys.InitControllerFailed.ToLocalization()));
+                LangKeys.InitControllerFailed.ToLocalization(),
+                showToast: !_suppressConnectionAttemptErrorToast));
 
             if (controller == null)
             {
@@ -1651,9 +1653,11 @@ public class MaaProcessor
     private void HandleInitializationError(Exception e,
         string message,
         bool hasWarning = false,
-        string waringMessage = "")
+        string waringMessage = "",
+        bool showToast = true)
     {
-        ToastHelper.Error(message);
+        if (showToast)
+            ToastHelper.Error(message);
         if (hasWarning)
             LoggerHelper.Warning(waringMessage);
         LoggerHelper.Error($"初始化控制器失败：message={message}, reason={e.Message}", e);
@@ -1663,9 +1667,11 @@ public class MaaProcessor
         string title,
         string message,
         bool hasWarning = false,
-        string waringMessage = "")
+        string waringMessage = "",
+        bool showToast = true)
     {
-        ToastHelper.Error(title, message);
+        if (showToast)
+            ToastHelper.Error(title, message);
         if (hasWarning)
             LoggerHelper.Warning(waringMessage);
         LoggerHelper.Error($"初始化控制器失败：title={title}, message={message}, reason={e.Message}", e);
@@ -3077,6 +3083,9 @@ public class MaaProcessor
             return;
         }
 
+        var previousSuppressConnectionAttemptErrorToast = _suppressConnectionAttemptErrorToast;
+        _suppressConnectionAttemptErrorToast = true;
+
         try
         {
             if (ViewModel?.IsConnected == true)
@@ -3108,7 +3117,7 @@ public class MaaProcessor
             }
 
             if (!isPlayCover && ViewModel?.CurrentDevice == null && InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true) && !delayFingerprintMatching)
-                ViewModel?.TryReadAdbDeviceFromConfig(false, true);
+                ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false);
 
             var tuple = await TryConnectAsync(token);
             var connected = tuple.Item1;
@@ -3125,12 +3134,13 @@ public class MaaProcessor
                     () =>
                     {
                         if (InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true))
-                            ViewModel?.TryReadAdbDeviceFromConfig(false, true);
+                            ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false);
                     });
             }
 
             if (!connected)
             {
+                _suppressConnectionAttemptErrorToast = previousSuppressConnectionAttemptErrorToast;
                 if (!tuple.Item2 && shouldRetry)
                     HandleConnectionFailureAsync(controllerType, token);
                 throw new Exception(ConnectionFailedAfterAllRetriesMessage);
@@ -3140,6 +3150,7 @@ public class MaaProcessor
         }
         finally
         {
+            _suppressConnectionAttemptErrorToast = previousSuppressConnectionAttemptErrorToast;
             Interlocked.Exchange(ref _isConnecting, 0);
         }
     }
@@ -3156,7 +3167,7 @@ public class MaaProcessor
 
         if (InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true) && !delayFingerprintMatching)
         {
-            ViewModel.TryReadAdbDeviceFromConfig(false, true);
+            ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false);
             currentAdbDevice = ViewModel.CurrentDevice as AdbDeviceInfo;
             hasValidAdbSerial = !string.IsNullOrWhiteSpace(currentAdbDevice?.AdbSerial);
             if (hasValidAdbSerial)
@@ -3176,7 +3187,7 @@ public class MaaProcessor
         await RetryConnectionAsync(token, showMessage, StartSoftware, LangKeys.TryToStartEmulator, true, () =>
         {
             if (InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true))
-                ViewModel.TryReadAdbDeviceFromConfig(false, true);
+                ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false);
         });
     }
 
@@ -3198,7 +3209,7 @@ public class MaaProcessor
 
                 LoggerHelper.Warning("ADB 连接失败，正在尝试启动模拟器并刷新设备目标。");
                 return await RetryConnectionAsync(t, showMessage, StartSoftware, LangKeys.TryToStartEmulator, true,
-                    () => ViewModel?.TryReadAdbDeviceFromConfig(false, true));
+                    () => ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false));
             },
             async t => await RetryConnectionAsync(t, showMessage, ReconnectByAdb, LangKeys.TryToReconnect),
             async t => await RetryConnectionAsync(t, showMessage, RestartAdb, LangKeys.RestartAdb, InstanceConfiguration.GetValue(ConfigurationKeys.AllowAdbRestart, true)),
@@ -3698,7 +3709,7 @@ public class MaaProcessor
 
         if (ViewModel?.IsConnected != true)
         {
-            ViewModel?.TryReadAdbDeviceFromConfig(false);
+            ViewModel?.TryReadAdbDeviceFromConfig(false, false, true, false);
         }
     }
     private CancellationTokenSource? _emulatorCancellationTokenSource;
@@ -3823,7 +3834,7 @@ public class MaaProcessor
 
             if (ViewModel?.CurrentController != MaaControllerTypes.PlayCover)
             {
-                ViewModel?.TryReadAdbDeviceFromConfig(false, true);
+                ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false);
             }
 
             var tuple = await TryConnectAsync(token);

@@ -1470,7 +1470,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         return Task.CompletedTask;
     }
 
-    public void AutoDetectDevice(CancellationToken token = default)
+    public void AutoDetectDevice(CancellationToken token = default, bool showToast = true)
     {
         if (CurrentController == MaaControllerTypes.PlayCover)
         {
@@ -1494,7 +1494,8 @@ public partial class TaskQueueViewModel : ViewModelBase
         var controllerType = CurrentController;
         var isAdb = controllerType == MaaControllerTypes.Adb;
 
-        ToastHelper.Info(GetDetectionMessage(controllerType));
+        if (showToast)
+            ToastHelper.Info(GetDetectionMessage(controllerType));
         SetConnected(false);
         token.ThrowIfCancellationRequested();
         var (devices, index) = isAdb ? DetectAdbDevices() : DetectWin32Windows();
@@ -1503,7 +1504,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         token.ThrowIfCancellationRequested();
         HandleControllerSettings(controllerType);
         token.ThrowIfCancellationRequested();
-        UpdateConnectionStatus(devices.Count > 0, controllerType);
+        UpdateConnectionStatus(devices.Count > 0, controllerType, showToast);
     }
 
     private string GetDetectionMessage(MaaControllerTypes controllerType) =>
@@ -1851,9 +1852,9 @@ public partial class TaskQueueViewModel : ViewModelBase
         }
     }
 
-    private void UpdateConnectionStatus(bool hasDevices, MaaControllerTypes controllerType)
+    private void UpdateConnectionStatus(bool hasDevices, MaaControllerTypes controllerType, bool showToast = true)
     {
-        if (!hasDevices)
+        if (!hasDevices && showToast)
         {
             var isAdb = controllerType == MaaControllerTypes.Adb;
             ToastHelper.Info((
@@ -1887,7 +1888,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         LoggerHelper.Error($"读取{targetKey.ToLocalization()}配置失败：{ex.Message}", ex);
     }
 
-    public void TryReadAdbDeviceFromConfig(bool inTask = true, bool refresh = false, bool allowAutoDetect = true)
+    public void TryReadAdbDeviceFromConfig(bool inTask = true, bool refresh = false, bool allowAutoDetect = true, bool showToast = true)
     {
         if (CurrentController == MaaControllerTypes.PlayCover)
         {
@@ -1944,9 +1945,9 @@ public partial class TaskQueueViewModel : ViewModelBase
             _refreshCancellationTokenSource?.Cancel();
             _refreshCancellationTokenSource = new CancellationTokenSource();
             if (inTask)
-                TaskManager.RunTask(() => AutoDetectDevice(_refreshCancellationTokenSource.Token), name: "刷新设备");
+                TaskManager.RunTask(() => AutoDetectDevice(_refreshCancellationTokenSource.Token, showToast), name: "刷新设备");
             else
-                AutoDetectDevice(_refreshCancellationTokenSource.Token);
+                AutoDetectDevice(_refreshCancellationTokenSource.Token, showToast);
             return;
         }
         // 检查是否启用指纹匹配功能
