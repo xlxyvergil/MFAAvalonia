@@ -120,6 +120,19 @@ public static partial class Instances
         return ServiceCache.TryGetValue(serviceType, out var lazy) && lazy.IsValueCreated;
     }
 
+    public static bool TryGetResolved<T>(out T? instance) where T : class
+    {
+        var serviceType = typeof(T);
+        if (ServiceCache.TryGetValue(serviceType, out var lazy) && lazy.IsValueCreated)
+        {
+            instance = (T)lazy.Value;
+            return true;
+        }
+
+        instance = null;
+        return false;
+    }
+
     /// <summary>
     /// 从接口类型创建实现类实例（设计时专用）
     /// 规则：去掉接口的"I"前缀，查找同一命名空间下的实现类
@@ -400,13 +413,23 @@ public static partial class Instances
 
     public static void ReloadConfigurationForSwitch(bool refreshTask = true)
     {
-        _ = ReloadConfigurationForSwitchAsync(refreshTask);
+        var task = ReloadConfigurationForSwitchAsync(refreshTask);
+        task.ContinueWith(t =>
+        {
+            LoggerHelper.Error($"刷新配置失败：原因={t.Exception?.GetBaseException().Message}", t.Exception);
+        }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
     public static async Task ReloadConfigurationForSwitchAsync(bool refreshTask = true)
     {
         static Task UpdateProgressAsync(double value) =>
-            DispatcherHelper.RunOnMainThreadAsync(() => Instances.RootViewModel.SetConfigSwitchProgress(value));
+            DispatcherHelper.RunOnMainThreadAsync(() =>
+            {
+                if (TryGetResolved<RootViewModel>(out var rootViewModel))
+                {
+                    rootViewModel.SetConfigSwitchProgress(value);
+                }
+            });
 
         await UpdateProgressAsync(30);
 

@@ -5,6 +5,7 @@ using MFAAvalonia.Configuration;
 using MFAAvalonia.Extensions;
 using MFAAvalonia.Extensions.MaaFW;
 using MFAAvalonia.Helper;
+using MFAAvalonia.ViewModels.Other;
 using SukiUI.Dialogs;
 using System;
 using System.Linq;
@@ -15,7 +16,7 @@ public partial class RootViewModel : ViewModelBase
 {
     protected override void Initialize()
     {
-        CheckDebug();
+        DispatcherHelper.PostOnMainThread(CheckDebug);
     }
 
     [ObservableProperty] private bool _idle = true;
@@ -101,7 +102,9 @@ public partial class RootViewModel : ViewModelBase
 
     public void CheckDebug()
     {
-        var vm = Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel;
+        var vm = Instances.TryGetResolved<InstanceTabBarViewModel>(out var tabBarViewModel)
+            ? tabBarViewModel.ActiveTab?.TaskQueueViewModel
+            : null;
         if (IsDebugMode && _shouldTip && vm != null && !vm.Processor.IsV3)
         {
             DispatcherHelper.PostOnMainThread(() =>
