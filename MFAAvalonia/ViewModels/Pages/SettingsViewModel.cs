@@ -64,8 +64,32 @@ public partial class SettingsViewModel : ViewModelBase
         tabVm.PropertyChanged += OnInstanceTabBarViewModelPropertyChanged;
         tabVm.Tabs.CollectionChanged += OnConfigurationListCollectionChanged;
 
+        ApplyInterfaceMetadata(MaaProcessor.Interface);
         RefreshCurrentConfiguration();
         RefreshFilteredConfigurationList();
+    }
+
+    public void ApplyInterfaceMetadata(MaaInterface? maaInterface)
+    {
+        if (maaInterface == null)
+        {
+            ShowResourceIssues = false;
+            ResourceGithub = string.Empty;
+            ResourceIssues = string.Empty;
+            ResourceDescription = string.Empty;
+            ResourceContact = string.Empty;
+            ResourceLicense = string.Empty;
+            HasResourceDescription = false;
+            HasResourceContact = false;
+            HasResourceLicense = false;
+            return;
+        }
+
+        ShowResourceIssues = !string.IsNullOrWhiteSpace(maaInterface.Url) || !string.IsNullOrWhiteSpace(maaInterface.Github);
+        ResourceGithub = (!string.IsNullOrWhiteSpace(maaInterface.Github) ? maaInterface.Github : maaInterface.Url) ?? string.Empty;
+        ResourceIssues = string.IsNullOrWhiteSpace(ResourceGithub)
+            ? string.Empty
+            : $"{ResourceGithub}/issues";
     }
 
     partial void OnCurrentConfigurationChanged(InstanceTabViewModel? value)

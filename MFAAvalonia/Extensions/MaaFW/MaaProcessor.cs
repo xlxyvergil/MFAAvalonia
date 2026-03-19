@@ -548,9 +548,10 @@ public class MaaProcessor
 
             if (value != null)
             {
-                Instances.SettingsViewModel.ShowResourceIssues = !string.IsNullOrWhiteSpace(value.Url) || !string.IsNullOrWhiteSpace(value.Github);
-                Instances.SettingsViewModel.ResourceGithub = (!string.IsNullOrWhiteSpace(value.Github) ? value.Github : value.Url) ?? "";
-                Instances.SettingsViewModel.ResourceIssues = $"{(!string.IsNullOrWhiteSpace(value.Github) ? value.Github : value.Url)}/issues";
+                if (Instances.IsResolved<SettingsViewModel>())
+                {
+                    Instances.SettingsViewModel.ApplyInterfaceMetadata(value);
+                }
 
                 // 加载多语言配置
                 if (value.Languages is { Count: > 0 })
@@ -585,43 +586,50 @@ public class MaaProcessor
     {
         var projectDir = AppPaths.DataRoot;
 
+        if (!Instances.IsResolved<SettingsViewModel>())
+        {
+            return;
+        }
+
+        var settingsViewModel = Instances.SettingsViewModel;
+
         // 加载 Description
         if (!string.IsNullOrWhiteSpace(maaInterface.Description))
         {
             var description = await maaInterface.Description.ResolveContentAsync(projectDir);
-            Instances.SettingsViewModel.ResourceDescription = description;
-            Instances.SettingsViewModel.HasResourceDescription = !string.IsNullOrWhiteSpace(description);
+            settingsViewModel.ResourceDescription = description;
+            settingsViewModel.HasResourceDescription = !string.IsNullOrWhiteSpace(description);
         }
         else
         {
-            Instances.SettingsViewModel.ResourceDescription = string.Empty;
-            Instances.SettingsViewModel.HasResourceDescription = false;
+            settingsViewModel.ResourceDescription = string.Empty;
+            settingsViewModel.HasResourceDescription = false;
         }
 
         // 加载 Contact
         if (!string.IsNullOrWhiteSpace(maaInterface.Contact))
         {
             var contact = await maaInterface.Contact.ResolveContentAsync(projectDir);
-            Instances.SettingsViewModel.ResourceContact = contact;
-            Instances.SettingsViewModel.HasResourceContact = !string.IsNullOrWhiteSpace(contact);
+            settingsViewModel.ResourceContact = contact;
+            settingsViewModel.HasResourceContact = !string.IsNullOrWhiteSpace(contact);
         }
         else
         {
-            Instances.SettingsViewModel.ResourceContact = string.Empty;
-            Instances.SettingsViewModel.HasResourceContact = false;
+            settingsViewModel.ResourceContact = string.Empty;
+            settingsViewModel.HasResourceContact = false;
         }
 
         // 加载 License
         if (!string.IsNullOrWhiteSpace(maaInterface.License))
         {
             var license = await maaInterface.License.ResolveContentAsync(projectDir);
-            Instances.SettingsViewModel.ResourceLicense = license;
-            Instances.SettingsViewModel.HasResourceLicense = !string.IsNullOrWhiteSpace(license);
+            settingsViewModel.ResourceLicense = license;
+            settingsViewModel.HasResourceLicense = !string.IsNullOrWhiteSpace(license);
         }
         else
         {
-            Instances.SettingsViewModel.ResourceLicense = string.Empty;
-            Instances.SettingsViewModel.HasResourceLicense = false;
+            settingsViewModel.ResourceLicense = string.Empty;
+            settingsViewModel.HasResourceLicense = false;
         }
     }
 

@@ -6,7 +6,7 @@
         <Setter Property="ClipToBounds" Value="False" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Panel>
+                <Grid Background="Transparent">
                     <Border Padding="0" 
                             Margin="0,55,0,0"
                             ClipToBounds="True" 
@@ -76,7 +76,7 @@
                                       Height="28" />
                         </Panel>
                     </Border>
-                </Panel>
+                </Grid>
             </ControlTemplate>
         </Setter>
     </ControlTheme>

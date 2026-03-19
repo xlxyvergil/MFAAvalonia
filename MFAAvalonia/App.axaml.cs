@@ -721,52 +721,60 @@ public partial class App : Application
                 }
                 else
                 {
-                    // Linux/macOS: 尝试显示原生对话框
-                    try
+                    var shortMessage = message.Length > 2048
+                        ? message.Substring(0, 2048) + "...\n\n(Log truncated)"
+                        : message;
+
+                    MessageBox(IntPtr.Zero, shortMessage, $"MFAAvalonia {title}", 0x10); // MB_ICONERROR
+                }
+            }
+            else
+            {
+                // Linux/macOS: 尝试显示原生对话框
+                try
+                {
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                     {
-                        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                        var escapedMessage = message.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\r");
+                        var escapedTitle = title.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                        var psi = new ProcessStartInfo
                         {
-                            var escapedMessage = message.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\r");
-                            var escapedTitle = title.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                            FileName = "osascript",
+                            Arguments = $"-e \"display alert \\\"{escapedTitle}\\\" message \\\"{escapedMessage}\\\" as critical\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        Process.Start(psi)?.WaitForExit();
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        // 尝试 zenity
+                        try
+                        {
                             var psi = new ProcessStartInfo
                             {
-                                FileName = "osascript",
-                                Arguments = $"-e \"display alert \\\"{escapedTitle}\\\" message \\\"{escapedMessage}\\\" as critical\"",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
+                                FileName = "zenity",
+                                Arguments = $"--error --text=\"{message.Replace("\"", "\\\"")}\" --title=\"{title}\"",
+                                UseShellExecute = true
                             };
                             Process.Start(psi)?.WaitForExit();
                         }
-                        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                        catch
                         {
-                            // 尝试 zenity
-                            try
+                            // 尝试 kdialog
+                            var psi = new ProcessStartInfo
                             {
-                                var psi = new ProcessStartInfo
-                                {
-                                    FileName = "zenity",
-                                    Arguments = $"--error --text=\"{message.Replace("\"", "\\\"")}\" --title=\"{title}\"",
-                                    UseShellExecute = true
-                                };
-                                Process.Start(psi)?.WaitForExit();
-                            }
-                            catch
-                            {
-                                // 尝试 kdialog
-                                var psi = new ProcessStartInfo
-                                {
-                                    FileName = "kdialog",
-                                    Arguments = $"--error \"{message.Replace("\"", "\\\"")}\" --title \"{title}\"",
-                                    UseShellExecute = true
-                                };
-                                Process.Start(psi)?.WaitForExit();
-                            }
+                                FileName = "kdialog",
+                                Arguments = $"--error \"{message.Replace("\"", "\\\"")}\" --title \"{title}\"",
+                                UseShellExecute = true
+                            };
+                            Process.Start(psi)?.WaitForExit();
                         }
                     }
-                    catch
-                    {
-                        // 忽略跨平台对话框启动失败，已在上方输出到 Console
-                    }
+                }
+                catch
+                {
+                    // 忽略跨平台对话框启动失败，已在上方输出到 Console
                 }
             }
         }

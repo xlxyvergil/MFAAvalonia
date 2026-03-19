@@ -6,7 +6,7 @@
     <ControlTheme TargetType="suki:SukiDialogHost" x:Key="SukiDialogHostTheme">
         <Setter Property="Template">
             <ControlTemplate>
-                <Panel IsHitTestVisible="False">
+                <Panel Name="PART_Root">
                     <Border
                         Background="{DynamicResource SukiDialogBackground}"
                         HorizontalAlignment="Stretch"
@@ -40,6 +40,9 @@
                     </ContentControl>
                     <Panel.Styles>
                         <Style Selector="suki|SukiDialogHost[IsDialogOpen=True]">
+                            <Style Selector="^ Panel#PART_Root">
+                                <Setter Property="IsHitTestVisible" Value="True" />
+                            </Style>
                             <Style Selector="^ Border#PART_DialogBackground">
                                 <Setter Property="Opacity" Value="0.4" />
                                 <Setter Property="IsVisible" Value="True" />
@@ -53,6 +56,9 @@
                             </Style>
                         </Style>
                         <Style Selector="suki|SukiDialogHost[IsDialogOpen=False]">
+                            <Style Selector="^ Panel#PART_Root">
+                                <Setter Property="IsHitTestVisible" Value="False" />
+                            </Style>
                             <Style Selector="^ Border#PART_DialogBackground">
                                 <Setter Property="Opacity" Value="0" />
                                 <Setter Property="IsHitTestVisible" Value="False" />

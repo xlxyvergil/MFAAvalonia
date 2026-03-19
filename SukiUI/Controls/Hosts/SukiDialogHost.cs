@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Rendering.Composition;
+using Avalonia.Threading;
 using SukiUI.Dialogs;
 using SukiUI.Helpers;
 
@@ -89,11 +90,14 @@ namespace SukiUI.Controls
         private void ManagerOnDialogDismissed(object sender, SukiDialogManagerEventArgs args)
         {
             IsDialogOpen = false;
-            Task.Delay(500).ContinueWith(_ =>
+            _ = Task.Delay(500).ContinueWith(_ =>
             {
-                if (Dialog != args.Dialog) return;
-                Dialog = null;
-            }, TaskScheduler.FromCurrentSynchronizationContext());
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (Dialog != args.Dialog) return;
+                    Dialog = null;
+                });
+            }, TaskScheduler.Default);
         }
 
         static SukiDialogHost()
