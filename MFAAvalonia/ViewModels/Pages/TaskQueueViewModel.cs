@@ -1521,51 +1521,100 @@ public partial class TaskQueueViewModel : ViewModelBase
 
     private int CalculateAdbDeviceIndex(IList<AdbDeviceInfo> devices)
     {
+        var preferredDeviceIndex = FindPreferredAdbDeviceIndexByLaunchConfig(devices);
+        if (preferredDeviceIndex >= 0)
+        {
+            return preferredDeviceIndex;
+        }
+
         if (CurrentDevice is AdbDeviceInfo info)
         {
             LogUiStateChange("MatchAdbDevice", $"当前设备指纹：{DescribeAdbDeviceInfo(info)}");
-
-            // 使用指纹匹配设备
-            var matchedDevices = devices
-                .Where(device => device.MatchesFingerprint(info))
-                .ToList();
-
-            LoggerHelper.Info($"按指纹匹配到的设备数量：{matchedDevices.Count}");
-
-            // 多匹配时排序：先比AdbSerial前缀（冒号前），再比设备名称
-            if (matchedDevices.Any())
+            var matchedDevice = FindBestFingerprintMatchedAdbDevice(devices, info);
+            if (matchedDevice != null)
             {
-                matchedDevices.Sort((a, b) =>
-                {
-                    var aPrefix = a.AdbSerial.Split(':', 2)[0];
-                    var bPrefix = b.AdbSerial.Split(':', 2)[0];
-                    int prefixCompare = string.Compare(aPrefix, bPrefix, StringComparison.Ordinal);
-                    return prefixCompare != 0 ? prefixCompare : string.Compare(a.Name, b.Name, StringComparison.Ordinal);
-                });
-                return devices.IndexOf(matchedDevices.First());
+                return devices.IndexOf(matchedDevice);
             }
         }
 
-        var config = Processor.InstanceConfiguration.GetValue(ConfigurationKeys.EmulatorConfig, string.Empty);
-        if (string.IsNullOrWhiteSpace(config)) return 0;
+        return devices.Count > 0 ? 0 : -1;
+    }
 
-        var targetNumber = ExtractNumberFromEmulatorConfig(config);
-        return devices.Select((d, i) =>
-                TryGetIndexFromConfig(d.Config, out var index) && index == targetNumber ? i : -1)
-            .FirstOrDefault(i => i >= 0);
+    private int FindPreferredAdbDeviceIndexByLaunchConfig(IList<AdbDeviceInfo> devices)
+    {
+        var targetIndex = GetPreferredEmulatorIndexFromLaunchConfig();
+        if (targetIndex < 0)
+        {
+            return -1;
+        }
+
+        for (var i = 0; i < devices.Count; i++)
+        {
+            if (TryGetIndexFromConfig(devices[i].Config, out var index) && index == targetIndex)
+            {
+                LoggerHelper.Info($"按启动参数优先匹配 ADB 设备成功：多开号={targetIndex}，设备={DescribeAdbDeviceInfo(devices[i])}");
+                return i;
+            }
+        }
+
+        LoggerHelper.Info($"启动参数已指定多开号={targetIndex}，但当前未找到相同多开号的 ADB 设备，将回退到上次连接设备匹配。");
+        return -1;
+    }
+
+    private AdbDeviceInfo? FindBestFingerprintMatchedAdbDevice(IEnumerable<AdbDeviceInfo> devices, AdbDeviceInfo savedDevice)
+    {
+        var matchedDevices = devices
+            .Where(device => device.MatchesFingerprint(savedDevice))
+            .ToList();
+
+        LoggerHelper.Info($"按指纹匹配到的设备数量：{matchedDevices.Count}");
+
+        if (matchedDevices.Count == 0)
+        {
+            return null;
+        }
+
+        matchedDevices.Sort((a, b) =>
+        {
+            var aPrefix = a.AdbSerial.Split(':', 2)[0];
+            var bPrefix = b.AdbSerial.Split(':', 2)[0];
+            var prefixCompare = string.Compare(aPrefix, bPrefix, StringComparison.Ordinal);
+            return prefixCompare != 0 ? prefixCompare : string.Compare(a.Name, b.Name, StringComparison.Ordinal);
+        });
+
+        return matchedDevices[0];
+    }
+
+    private int GetPreferredEmulatorIndexFromLaunchConfig()
+    {
+        var config = Processor.InstanceConfiguration.GetValue(ConfigurationKeys.EmulatorConfig, string.Empty);
+        return ExtractNumberFromEmulatorConfig(config);
     }
 
 
     public static int ExtractNumberFromEmulatorConfig(string emulatorConfig)
     {
-        var match = Regex.Match(emulatorConfig, @"\d+");
-
-        if (match.Success)
+        emulatorConfig = emulatorConfig.Trim();
+        if (string.IsNullOrWhiteSpace(emulatorConfig))
         {
-            return int.Parse(match.Value);
+            return -1;
         }
 
-        return 0;
+        foreach (var prefix in MultiInstanceEditorDialogViewModel.EmulatorMultiOpenArgumentPrefixes.Values)
+        {
+            if (!emulatorConfig.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var indexPart = emulatorConfig[prefix.Length..].Trim();
+            if (int.TryParse(indexPart, out var index) && index >= 0)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private bool TryGetIndexFromConfig(string configJson, out int index)
@@ -1963,20 +2012,33 @@ public partial class TaskQueueViewModel : ViewModelBase
             // 搜索当前可用的设备
             var currentDevices = MaaProcessor.Toolkit.AdbDevice.Find();
 
-            // 尝试通过指纹匹配找到对应的设备（当任一方index为-1时不比较index）
-            AdbDeviceInfo? matchedDevice = null;
-            foreach (var device in currentDevices)
+            var preferredDeviceIndex = FindPreferredAdbDeviceIndexByLaunchConfig(currentDevices);
+            if (preferredDeviceIndex >= 0)
             {
-                if (device.MatchesFingerprint(savedDevice1))
+                var preferredDevice = currentDevices[preferredDeviceIndex];
+                DispatcherHelper.RunOnMainThread(() =>
                 {
-                    matchedDevice = device;
-                    LoggerHelper.Info($"已通过指纹匹配到设备：名称={device.Name}，ADB 序列号={device.AdbSerial}");
-                    break;
-                }
+                    _suppressAutoConnect = true;
+                    try
+                    {
+                        Devices = new ObservableCollection<object>(currentDevices);
+                        CurrentDevice = preferredDevice;
+                    }
+                    finally
+                    {
+                        _suppressAutoConnect = false;
+                    }
+                });
+                ChangedDevice(preferredDevice);
+                return;
             }
+
+            // 尝试通过指纹匹配找到对应的设备（当任一方index为-1时不比较index）
+            var matchedDevice = FindBestFingerprintMatchedAdbDevice(currentDevices, savedDevice1);
 
             if (matchedDevice != null)
             {
+                LoggerHelper.Info($"已通过指纹匹配到设备：名称={matchedDevice.Name}，ADB 序列号={matchedDevice.AdbSerial}");
                 // 使用新搜索到的设备信息（AdbSerial等可能已更新）
                 DispatcherHelper.RunOnMainThread(() =>
                 {
