@@ -696,8 +696,42 @@ public class MaaProcessor
         return task.Result;
     }
 
+    private bool HasReusableMainTasker()
+    {
+        var tasker = MaaTasker;
+        if (tasker == null)
+            return false;
+
+        try
+        {
+            var controller = tasker.Controller;
+            if (controller == null)
+                return false;
+
+            if (tasker.IsRunning || tasker.IsStopping)
+                return true;
+
+            return controller.IsConnected;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"检查主任务执行器状态失败：{ex.Message}");
+            return false;
+        }
+    }
+
     public async Task<MaaTasker?> GetTaskerAsync(CancellationToken token = default)
     {
+        if (MaaTasker != null && !HasReusableMainTasker())
+        {
+            LoggerHelper.Warning("检测到主任务执行器已断连或不可用，准备重新初始化。");
+            SetTasker();
+        }
+
         if (MaaTasker == null)
         {
             var initializedTasker = (await InitializeMaaTasker(token)).Item1;
@@ -715,7 +749,13 @@ public class MaaProcessor
 
     public async Task<(MaaTasker?, bool, bool)> GetTaskerAndBoolAsync(CancellationToken token = default)
     {
-        var tuple = MaaTasker != null ? (MaaTasker, false, false) : await InitializeMaaTasker(token);
+        if (MaaTasker != null && !HasReusableMainTasker())
+        {
+            LoggerHelper.Warning("检测到主任务执行器已断连或不可用，连接前将重新创建。");
+            SetTasker();
+        }
+
+        var tuple = MaaTasker != null ? (MaaTasker, false, true) : await InitializeMaaTasker(token);
         if (MaaTasker == null && tuple.Item1 != null)
         {
             MaaTasker = tuple.Item1;
@@ -3856,7 +3896,7 @@ public class MaaProcessor
 
             if (ViewModel?.CurrentController != MaaControllerTypes.PlayCover)
             {
-                ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false);
+                ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false, true);
             }
 
             var tuple = await TryConnectAsync(token);

@@ -1470,7 +1470,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         return Task.CompletedTask;
     }
 
-    public void AutoDetectDevice(CancellationToken token = default, bool showToast = true)
+    public void AutoDetectDevice(CancellationToken token = default, bool showToast = true, bool strictLaunchTarget = false)
     {
         if (CurrentController == MaaControllerTypes.PlayCover)
         {
@@ -1498,7 +1498,7 @@ public partial class TaskQueueViewModel : ViewModelBase
             ToastHelper.Info(GetDetectionMessage(controllerType));
         SetConnected(false);
         token.ThrowIfCancellationRequested();
-        var (devices, index) = isAdb ? DetectAdbDevices() : DetectWin32Windows();
+        var (devices, index) = isAdb ? DetectAdbDevices(strictLaunchTarget) : DetectWin32Windows();
         token.ThrowIfCancellationRequested();
         UpdateDeviceList(devices, index);
         token.ThrowIfCancellationRequested();
@@ -1512,19 +1512,25 @@ public partial class TaskQueueViewModel : ViewModelBase
             ? "EmulatorDetectionStarted".ToLocalization()
             : "WindowDetectionStarted".ToLocalization();
 
-    private (ObservableCollection<object> devices, int index) DetectAdbDevices()
+    private (ObservableCollection<object> devices, int index) DetectAdbDevices(bool strictLaunchTarget = false)
     {
         var devices = MaaProcessor.Toolkit.AdbDevice.Find();
-        var index = CalculateAdbDeviceIndex(devices);
+        var index = CalculateAdbDeviceIndex(devices, strictLaunchTarget);
         return (new(devices), index);
     }
 
-    private int CalculateAdbDeviceIndex(IList<AdbDeviceInfo> devices)
+    private int CalculateAdbDeviceIndex(IList<AdbDeviceInfo> devices, bool strictLaunchTarget = false)
     {
         var preferredDeviceIndex = FindPreferredAdbDeviceIndexByLaunchConfig(devices);
         if (preferredDeviceIndex >= 0)
         {
             return preferredDeviceIndex;
+        }
+
+        if (strictLaunchTarget && GetPreferredEmulatorIndexFromLaunchConfig() >= 0)
+        {
+            LoggerHelper.Info("启动阶段启用了严格多开匹配：当前未找到目标多开号设备，保持未选择状态。");
+            return -1;
         }
 
         if (CurrentDevice is AdbDeviceInfo info)
@@ -1937,7 +1943,7 @@ public partial class TaskQueueViewModel : ViewModelBase
         LoggerHelper.Error($"读取{targetKey.ToLocalization()}配置失败：{ex.Message}", ex);
     }
 
-    public void TryReadAdbDeviceFromConfig(bool inTask = true, bool refresh = false, bool allowAutoDetect = true, bool showToast = true)
+    public void TryReadAdbDeviceFromConfig(bool inTask = true, bool refresh = false, bool allowAutoDetect = true, bool showToast = true, bool strictLaunchTarget = false)
     {
         if (CurrentController == MaaControllerTypes.PlayCover)
         {
@@ -1994,9 +2000,9 @@ public partial class TaskQueueViewModel : ViewModelBase
             _refreshCancellationTokenSource?.Cancel();
             _refreshCancellationTokenSource = new CancellationTokenSource();
             if (inTask)
-                TaskManager.RunTask(() => AutoDetectDevice(_refreshCancellationTokenSource.Token, showToast), name: "刷新设备");
+                TaskManager.RunTask(() => AutoDetectDevice(_refreshCancellationTokenSource.Token, showToast, strictLaunchTarget), name: "刷新设备");
             else
-                AutoDetectDevice(_refreshCancellationTokenSource.Token, showToast);
+                AutoDetectDevice(_refreshCancellationTokenSource.Token, showToast, strictLaunchTarget);
             return;
         }
         // 检查是否启用指纹匹配功能
@@ -2033,6 +2039,25 @@ public partial class TaskQueueViewModel : ViewModelBase
                 return;
             }
 
+            if (strictLaunchTarget && GetPreferredEmulatorIndexFromLaunchConfig() >= 0)
+            {
+                LoggerHelper.Info("启动阶段启用了严格多开匹配：目标多开号设备尚未出现，本次不回退到历史设备。");
+                DispatcherHelper.RunOnMainThread(() =>
+                {
+                    _suppressAutoConnect = true;
+                    try
+                    {
+                        Devices = new ObservableCollection<object>(currentDevices);
+                        CurrentDevice = null;
+                    }
+                    finally
+                    {
+                        _suppressAutoConnect = false;
+                    }
+                });
+                return;
+            }
+
             // 尝试通过指纹匹配找到对应的设备（当任一方index为-1时不比较index）
             var matchedDevice = FindBestFingerprintMatchedAdbDevice(currentDevices, savedDevice1);
 
@@ -2062,9 +2087,9 @@ public partial class TaskQueueViewModel : ViewModelBase
                 _refreshCancellationTokenSource?.Cancel();
                 _refreshCancellationTokenSource = new CancellationTokenSource();
                 if (inTask)
-                    TaskManager.RunTask(() => AutoDetectDevice(_refreshCancellationTokenSource.Token), name: "刷新设备");
+                    TaskManager.RunTask(() => AutoDetectDevice(_refreshCancellationTokenSource.Token, true, strictLaunchTarget), name: "刷新设备");
                 else
-                    AutoDetectDevice(_refreshCancellationTokenSource.Token);
+                    AutoDetectDevice(_refreshCancellationTokenSource.Token, true, strictLaunchTarget);
             }
         }
         else
