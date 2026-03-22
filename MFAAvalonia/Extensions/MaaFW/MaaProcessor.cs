@@ -1493,6 +1493,8 @@ public class MaaProcessor
             jObject = new JObject();
         }
 
+        var callbackName = jObject["name"]?.ToString() ?? string.Empty;
+
         MaaTasker? tasker = null;
         if (sender is MaaTasker t)
             tasker = t;

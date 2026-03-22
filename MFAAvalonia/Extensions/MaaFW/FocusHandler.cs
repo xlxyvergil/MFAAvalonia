@@ -222,10 +222,23 @@ public class FocusHandler
                     _viewModel.AddMarkdown(TaskQueueView.ConvertCustomMarkup(displayText));
                     break;
                 case "toast":
-                    ToastHelper.Info(LangKeys.Tip.ToLocalization(), CreateMarkdownContent(displayText, ToastMarkdownMaxHeight));
+                    DispatcherHelper.RunOnMainThread(() =>
+                        ToastHelper.CreateToastByType(
+                                Avalonia.Controls.Notifications.NotificationType.Information,
+                                LangKeys.Tip.ToLocalization(),
+                                CreateMarkdownContent(displayText, ToastMarkdownMaxHeight))
+                            .Queue());
                     break;
                 case "notification":
-                    ToastNotification.Show(LangKeys.Tip.ToLocalization(), CreateMarkdownContent(displayText, NotificationMarkdownMaxHeight));
+                    DispatcherHelper.PostOnMainThread(() =>
+                    {
+                        ToastNotification.Instance.AddToast(new NotificationView(4000)
+                        {
+                            TitleText = LangKeys.Tip.ToLocalization(),
+                            MessageText = CreateMarkdownContent(displayText, NotificationMarkdownMaxHeight)
+                        });
+                        ToastNotification.PlayNotificationSound();
+                    });
                     break;
                 case "dialog":
                     // 非阻塞式弹窗：fire-and-forget，任务继续执行
@@ -352,7 +365,9 @@ public class FocusHandler
         if (string.IsNullOrWhiteSpace(template))
             return string.Empty;
 
-        var resolved = template.ResolveContentAsync().GetAwaiter().GetResult();
+        var contentBaseDir = GetFocusContentBaseDir();
+        var resolved = template.ResolveContentAsync(contentBaseDir).GetAwaiter().GetResult();
+        LogUnresolvedFocusPath(template, resolved, contentBaseDir);
         return ReplacePlaceholders(resolved, detailsObj, imageBuffer);
     }
 
@@ -362,7 +377,9 @@ public class FocusHandler
             return string.Empty;
 
         var value = HandleStringsWithVariables(template);
-        var resolved = value.ResolveContentAsync().GetAwaiter().GetResult();
+        var contentBaseDir = GetFocusContentBaseDir();
+        var resolved = value.ResolveContentAsync(contentBaseDir).GetAwaiter().GetResult();
+        LogUnresolvedFocusPath(value, resolved, contentBaseDir);
 
         // 兼容 focus 老协议里直接使用普通 i18n key 的情况。
         if (resolved == value)
@@ -373,6 +390,49 @@ public class FocusHandler
         }
 
         return resolved;
+    }
+
+    private static string GetFocusContentBaseDir()
+    {
+        var interfacePath = MaaProcessor.GetInterfaceFilePath();
+        if (!string.IsNullOrWhiteSpace(interfacePath))
+        {
+            var interfaceDir = Path.GetDirectoryName(interfacePath);
+            if (!string.IsNullOrWhiteSpace(interfaceDir))
+                return interfaceDir;
+        }
+
+        return AppPaths.DataRoot;
+    }
+
+    private static void LogUnresolvedFocusPath(string original, string resolved, string baseDir)
+    {
+        if (!LooksLikeFilePath(original))
+            return;
+
+        if (resolved != original)
+            return;
+
+        var candidatePath = MaaInterface.ReplacePlaceholder(original, baseDir, true);
+        LoggerHelper.Warning(
+            $"Focus 内容文件解析失败：input={original}, baseDir={baseDir}, candidate={candidatePath}, exists={File.Exists(candidatePath)}");
+    }
+
+    private static bool LooksLikeFilePath(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return false;
+
+        if (input.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || input.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            || input.StartsWith("$", StringComparison.Ordinal))
+            return false;
+
+        return input.Contains(Path.DirectorySeparatorChar)
+               || input.Contains(Path.AltDirectorySeparatorChar)
+               || input.StartsWith("./", StringComparison.Ordinal)
+               || input.StartsWith("../", StringComparison.Ordinal)
+               || Path.HasExtension(input);
     }
 
     private static Control CreateMarkdownContent(string markdown, double maxHeight)
