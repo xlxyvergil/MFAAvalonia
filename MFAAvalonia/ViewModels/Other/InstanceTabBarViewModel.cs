@@ -393,6 +393,13 @@ public partial class InstanceTabBarViewModel : ViewModelBase
                 var taskViewModel = ActiveTab?.TaskQueueViewModel;
                 if (taskViewModel == null) return;
 
+                // 运行中的实例切回前台时，不要重建控制器/资源状态。
+                // 这些初始化链路可能触发 SetTasker，进而打断正在执行的任务。
+                if (taskViewModel.IsRunning)
+                {
+                    return;
+                }
+
                 taskViewModel.InitializeControllerOptions();
                 taskViewModel.UpdateResourcesForController(taskViewModel.CurrentResource);
             });
