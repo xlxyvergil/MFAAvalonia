@@ -16,12 +16,29 @@ namespace MFAAvalonia.Helper;
 public static class LanguageHelper
 {
     public static event EventHandler<LanguageEventArgs>? LanguageChanged;
+    private static readonly string[] SupportedLanguageKeys = ["zh-CN", "zh-Hant", "en-US", "ja-JP"];
+    private static readonly Dictionary<object, string> LegacyLanguageMappings = new()
+    {
+        ["zh-CN"] = "zh-CN",
+        ["zh-Hant"] = "zh-Hant",
+        ["en-US"] = "en-US",
+        ["ja-JP"] = "ja-JP",
+        [0] = "zh-CN",
+        [1] = "zh-Hant",
+        [2] = "en-US",
+        [3] = "ja-JP",
+        [0L] = "zh-CN",
+        [1L] = "zh-Hant",
+        [2L] = "en-US",
+        [3L] = "ja-JP",
+    };
 
     public static readonly List<SupportedLanguage> SupportedLanguages =
     [
         new("zh-CN", "简体中文"),
         new("zh-Hant", "繁體中文"),
         new("en-US", "English"),
+        new("ja-JP", "日本語"),
     ];
 
     public static Dictionary<string, CultureInfo> Cultures { get; } = new();
@@ -58,7 +75,7 @@ public static class LanguageHelper
 
     // 存储语言的字典
     private static readonly Dictionary<string, Dictionary<string, string>> Langs = new();
-    private static string _currentLanguage = ConfigurationManager.Current.GetValue(ConfigurationKeys.CurrentLanguage, LanguageHelper.SupportedLanguages[0].Key, ["zh-CN", "zh-Hant", "en-US"]);
+    private static string _currentLanguage = LoadConfiguredLanguage();
     public static string CurrentLanguage => _currentLanguage;
     public static void Initialize()
     {
@@ -74,7 +91,25 @@ public static class LanguageHelper
         {
             plugin.Load(defaultCulture);
         }
+        PersistNormalizedCurrentLanguage();
         LoadLanguages();
+    }
+
+    private static string LoadConfiguredLanguage()
+    {
+        return ConfigurationManager.Current.GetValue(
+            ConfigurationKeys.CurrentLanguage,
+            SupportedLanguages[0].Key,
+            LegacyLanguageMappings);
+    }
+
+    private static void PersistNormalizedCurrentLanguage()
+    {
+        var configuredLanguage = LoadConfiguredLanguage();
+        _currentLanguage = SupportedLanguageKeys.Contains(configuredLanguage)
+            ? configuredLanguage
+            : SupportedLanguages[0].Key;
+        ConfigurationManager.Current.SetValue(ConfigurationKeys.CurrentLanguage, _currentLanguage);
     }
 
     private static void LoadLanguages()
@@ -180,6 +215,9 @@ public static class LanguageHelper
 
         if (IsEnglish(normalized))
             return "en-US";
+
+        if (IsJapanese(normalized))
+            return "ja-JP";
 
         return null;
     }
@@ -289,6 +327,23 @@ public static class LanguageHelper
             "en-gb"
         ];
         foreach (string prefix in englishPrefixes)
+        {
+            if (langCode.Replace("_", "-").StartsWith(prefix))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsJapanese(string langCode)
+    {
+        string[] japanesePrefixes =
+        [
+            "ja",
+            "ja-jp"
+        ];
+        foreach (string prefix in japanesePrefixes)
         {
             if (langCode.Replace("_", "-").StartsWith(prefix))
             {

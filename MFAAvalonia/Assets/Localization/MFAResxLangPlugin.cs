@@ -89,9 +89,9 @@ public class MFAResxLangPlugin : ILangPlugin
     {
         var culture = Culture.Name;
 
-        string? Get()
+        string? Get(string currentCulture)
         {
-            if (Resources.TryGetValue(culture, out var currentLanguages)
+            if (Resources.TryGetValue(currentCulture, out var currentLanguages)
                 && currentLanguages.Languages.TryGetValue(key, out var resource))
             {
                 return resource;
@@ -105,28 +105,75 @@ public class MFAResxLangPlugin : ILangPlugin
             culture = cultureName;
         }
 
-        // bool isFirst = true;
-        var resource = Get();
-        if (!string.IsNullOrWhiteSpace(resource))
+        foreach (var candidate in GetFallbackCultures(culture))
         {
-            return resource;
-        }
-
-        Sync(new CultureInfo(culture));
-        resource = Get();
-        if (!string.IsNullOrWhiteSpace(resource))
-        {
-            return resource;
-        }
-
-        culture = _defaultCulture?.Name ?? "";
-        resource = Get();
-        if (!string.IsNullOrWhiteSpace(resource))
-        {
-            return resource;
+            try
+            {
+                Sync(new CultureInfo(candidate));
+            }
+            catch
+            {
+                continue;
+            }
+            var resource = Get(candidate);
+            if (!string.IsNullOrWhiteSpace(resource))
+            {
+                return resource;
+            }
         }
 
         return key;
+    }
+
+    private IEnumerable<string> GetFallbackCultures(string culture)
+    {
+        var candidates = new List<string>();
+
+        void Add(string? candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate) || candidates.Contains(candidate))
+                return;
+            candidates.Add(candidate);
+        }
+
+        var normalized = culture.Replace('_', '-');
+        Add(normalized);
+
+        try
+        {
+            var cultureInfo = new CultureInfo(normalized);
+            if (!cultureInfo.IsNeutralCulture)
+            {
+                Add(cultureInfo.TwoLetterISOLanguageName);
+            }
+        }
+        catch
+        {
+            // Ignore invalid culture name and continue with explicit fallbacks.
+        }
+
+        if (normalized.StartsWith("zh-Hant", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("zh-TW", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("zh-HK", StringComparison.OrdinalIgnoreCase)
+            || normalized.StartsWith("zh-MO", StringComparison.OrdinalIgnoreCase))
+        {
+            Add("zh-Hant");
+            Add("zh-CN");
+            Add("en-US");
+        }
+        else if (normalized.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+        {
+            Add("zh-CN");
+            Add("en-US");
+        }
+        else
+        {
+            Add("en-US");
+            Add("zh-CN");
+        }
+
+        Add(_defaultCulture?.Name);
+        return candidates;
     }
 
     private void Sync(CultureInfo cultureInfo)
@@ -138,18 +185,16 @@ public class MFAResxLangPlugin : ILangPlugin
 
         IEnumerable<DictionaryEntry> GetResources(ResourceManager resourceManager)
         {
-            var baseEntries = resourceManager.GetResourceSet(CultureInfo.InvariantCulture, true, true)
-                ?.OfType<DictionaryEntry>();
-            var cultureEntries = resourceManager.GetResourceSet(cultureInfo, true, true)?.OfType<DictionaryEntry>();
-            if (cultureEntries == null || baseEntries == null)
+            var targetCulture = cultureInfo.Name.Equals("zh-CN", StringComparison.OrdinalIgnoreCase)
+                ? CultureInfo.InvariantCulture
+                : cultureInfo;
+            var resourceSet = resourceManager.GetResourceSet(targetCulture, true, false);
+            if (resourceSet == null)
             {
                 yield break;
             }
 
-            foreach (var entry in cultureEntries
-                         .Concat(baseEntries)
-                         .GroupBy(entry => entry.Key)
-                         .Select(entries => entries.First()))
+            foreach (var entry in resourceSet.OfType<DictionaryEntry>())
             {
                 yield return entry;
             }
@@ -171,6 +216,8 @@ public class MFAResxLangPlugin : ILangPlugin
             };
             Resources[cultureName] = currentLanResources;
         }
+
+        currentLanResources.Languages.Clear();
 
         foreach (var pair in _resourceManagers)
         {

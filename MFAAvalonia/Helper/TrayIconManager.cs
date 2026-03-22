@@ -88,8 +88,7 @@ public class TrayIconManager
             langMenu.Click += (sender, _) =>
             {
                 LanguageHelper.ChangeLanguage(lang);
-                var index = LanguageHelper.SupportedLanguages.ToList().FindIndex(language => language.Key == lang.Key);
-                ConfigurationManager.Current.SetValue(ConfigurationKeys.CurrentLanguage, index == -1 ? 0 : index);
+                ConfigurationManager.Current.SetValue(ConfigurationKeys.CurrentLanguage, lang.Key);
             };
             menuItem3.Menu.Add(langMenu);
         }

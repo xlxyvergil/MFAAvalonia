@@ -325,6 +325,9 @@ public partial class SukiTheme : Styles
             "en-US", new en_us()
         },
         {
+            "ja-JP", new ja_jp()
+        },
+        {
             "zh-CN", new zh_hans()
         },
         {
