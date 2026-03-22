@@ -133,8 +133,13 @@ public static class LanguageHelper
 
                 if (langResources != null)
                 {
-                    // 标准化语言代码
+                    // 标准化语言代码。未支持的语言不参与映射，避免覆盖现有语言资源。
                     var normalizedLangCode = NormalizeLangCode(langCode);
+                    if (normalizedLangCode == null)
+                    {
+                        LoggerHelper.Warning($"跳过未支持的语言文件：语言={langCode}，文件={processedPath}");
+                        continue;
+                    }
 
                     // 合并到现有语言资源（如果已存在则覆盖）
                     if (Langs.TryGetValue(normalizedLangCode, out var existingDict))
@@ -163,7 +168,7 @@ public static class LanguageHelper
     /// <summary>
     /// 标准化语言代码（将各种格式统一为内部使用的格式）
     /// </summary>
-    private static string NormalizeLangCode(string langCode)
+    private static string? NormalizeLangCode(string langCode)
     {
         var normalized = langCode.ToLower().Replace("_", "-");
 
@@ -173,7 +178,10 @@ public static class LanguageHelper
         if (IsTraditionalChinese(normalized))
             return "zh-Hant";
 
-        return "en-US";
+        if (IsEnglish(normalized))
+            return "en-US";
+
+        return null;
     }
 
     private static Dictionary<string, string> GetLocalizedStrings()
@@ -263,6 +271,24 @@ public static class LanguageHelper
             "zh-mo"
         ];
         foreach (string prefix in traditionalPrefixes)
+        {
+            if (langCode.Replace("_", "-").StartsWith(prefix))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsEnglish(string langCode)
+    {
+        string[] englishPrefixes =
+        [
+            "en",
+            "en-us",
+            "en-gb"
+        ];
+        foreach (string prefix in englishPrefixes)
         {
             if (langCode.Replace("_", "-").StartsWith(prefix))
             {
