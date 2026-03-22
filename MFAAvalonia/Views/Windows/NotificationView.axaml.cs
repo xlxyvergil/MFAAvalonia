@@ -55,19 +55,19 @@ public partial class NotificationView : SukiWindow
         set => SetValue(HasActionButtonProperty, value);
     }
 
-    public static readonly StyledProperty<string> TitleTextProperty =
-        AvaloniaProperty.Register<NotificationView, string>(nameof(TitleText), "Title");
+    public static readonly StyledProperty<object?> TitleTextProperty =
+        AvaloniaProperty.Register<NotificationView, object?>(nameof(TitleText), "Title");
 
-    public string TitleText
+    public object? TitleText
     {
         get => GetValue(TitleTextProperty);
         set => SetValue(TitleTextProperty, value);
     }
 
-    public static readonly StyledProperty<string> MessageTextProperty =
-        AvaloniaProperty.Register<NotificationView, string>(nameof(MessageText), "Content");
+    public static readonly StyledProperty<object?> MessageTextProperty =
+        AvaloniaProperty.Register<NotificationView, object?>(nameof(MessageText), "Content");
 
-    public string MessageText
+    public object? MessageText
     {
         get => GetValue(MessageTextProperty);
         set => SetValue(MessageTextProperty, value);
@@ -155,7 +155,7 @@ public partial class NotificationView : SukiWindow
         _ = StartSlideInAnimation(new PixelPoint(targetX, targetY));
     }
 
-    public void SetContent(string title, string message)
+    public void SetContent(object? title, object? message)
     {
         TitleText = title;
         MessageText = message;

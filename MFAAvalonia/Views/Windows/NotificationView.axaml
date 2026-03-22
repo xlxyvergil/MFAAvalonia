@@ -73,17 +73,31 @@
                 <StackPanel Grid.Column="1" VerticalAlignment="Top"
                             Grid.Row="1">
 
-                    <TextBlock VerticalAlignment="Top"
-                               Text="{Binding TitleText,RelativeSource={RelativeSource AncestorType=settings:NotificationView}}"
-                               FontSize="15" Margin="5 0 0 0"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Left" />
+                    <ContentPresenter VerticalAlignment="Top"
+                                      Content="{Binding TitleText,RelativeSource={RelativeSource AncestorType=settings:NotificationView}}"
+                                      Margin="5 0 0 0"
+                                      HorizontalAlignment="Left">
+                        <ContentPresenter.Styles>
+                            <Style Selector="TextBlock">
+                                <Setter Property="FontSize" Value="15" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                                <Setter Property="TextWrapping" Value="Wrap" />
+                            </Style>
+                        </ContentPresenter.Styles>
+                    </ContentPresenter>
 
 
-                    <TextBlock VerticalAlignment="Top"
-                               Text="{Binding MessageText,RelativeSource={RelativeSource AncestorType=settings:NotificationView}}"
-                               FontSize="14" HorizontalAlignment="Left"
-                               Margin="5 6 0 0" />
+                    <ContentPresenter VerticalAlignment="Top"
+                                      Content="{Binding MessageText,RelativeSource={RelativeSource AncestorType=settings:NotificationView}}"
+                                      HorizontalAlignment="Left"
+                                      Margin="5 6 0 0">
+                        <ContentPresenter.Styles>
+                            <Style Selector="TextBlock">
+                                <Setter Property="FontSize" Value="14" />
+                                <Setter Property="TextWrapping" Value="Wrap" />
+                            </Style>
+                        </ContentPresenter.Styles>
+                    </ContentPresenter>
                 </StackPanel>
             </Grid>
 

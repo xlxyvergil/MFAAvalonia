@@ -54,7 +54,7 @@ public class ToastNotification
         }
     }
     
-    public static void Show(string title, string content = "", int duration = 4000, bool sound = true)
+    public static void Show(object? title, object? content = null, int duration = 4000, bool sound = true)
     {
         // 检查是否启用了 Toast 通知
         if (!ConfigurationManager.Current.GetValue(ConfigurationKeys.EnableToastNotification, true))

@@ -1,6 +1,14 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
+using Markdown.Avalonia.Full;
+using Markdown.Avalonia.Html;
+using Markdown.Avalonia.Svg;
+using Markdown.Avalonia.SyntaxHigh;
 using MaaFramework.Binding.Buffers;
 using MaaFramework.Binding.Notification;
+using MFAAvalonia.Extensions;
 using MFAAvalonia.Helper;
 using MFAAvalonia.Helper.Converters;
 using MFAAvalonia.ViewModels.Pages;
@@ -25,6 +33,10 @@ namespace MFAAvalonia.Extensions.MaaFW;
 /// </summary>
 public class FocusHandler
 {
+    private const double ToastMarkdownMaxHeight = 220;
+    private const double DialogMarkdownMaxHeight = 520;
+    private const double NotificationMarkdownMaxHeight = 260;
+
     private AutoInitDictionary autoInitDictionary;
     private readonly TaskQueueViewModel _viewModel;
 
@@ -154,14 +166,13 @@ public class FocusHandler
     /// </summary>
     private void ProcessNewProtocol(JToken templateToken, JObject taskModel, JObject? detailsObj, MaaImageBuffer? imageBuffer)
     {
-        string? content = null;
         List<string> displays = new List<string> { "log" };
 
         if (templateToken.Type == JTokenType.Object)
         {
             // 对象形式：{ "content": "...", "display": "toast" | ["log","toast"] }
             var obj = (JObject)templateToken;
-            content = obj["content"]?.Value<string>();
+            var content = obj["content"]?.Value<string>();
             var displayToken = obj["display"];
             if (displayToken != null)
             {
@@ -172,7 +183,7 @@ public class FocusHandler
             }
             if (content != null)
             {
-                var displayText = ReplacePlaceholders(content.ResolveContentAsync().Result, detailsObj, imageBuffer);
+                var displayText = ResolveFocusContent(content, detailsObj, imageBuffer);
                 DispatchToChannels(displayText, displays);
             }
         }
@@ -184,7 +195,7 @@ public class FocusHandler
                 if (item.Type == JTokenType.String)
                 {
                     var template = item.Value<string>();
-                    var displayText = ReplacePlaceholders(template!.ResolveContentAsync().Result, detailsObj, imageBuffer);
+                    var displayText = ResolveFocusContent(template, detailsObj, imageBuffer);
                     DispatchToChannels(displayText, new List<string> { "log" });
                 }
             }
@@ -193,7 +204,7 @@ public class FocusHandler
         {
             // 字符串形式：display=log
             var template = templateToken.Value<string>();
-            var displayText = ReplacePlaceholders(template!.ResolveContentAsync().Result, detailsObj, imageBuffer);
+            var displayText = ResolveFocusContent(template, detailsObj, imageBuffer);
             DispatchToChannels(displayText, new List<string> { "log" });
         }
     }
@@ -211,10 +222,10 @@ public class FocusHandler
                     _viewModel.AddMarkdown(TaskQueueView.ConvertCustomMarkup(displayText));
                     break;
                 case "toast":
-                    ToastHelper.Info(displayText);
+                    ToastHelper.Info(LangKeys.Tip.ToLocalization(), CreateMarkdownContent(displayText, ToastMarkdownMaxHeight));
                     break;
                 case "notification":
-                    ToastNotification.Show(displayText);
+                    ToastNotification.Show(LangKeys.Tip.ToLocalization(), CreateMarkdownContent(displayText, NotificationMarkdownMaxHeight));
                     break;
                 case "dialog":
                     // 非阻塞式弹窗：fire-and-forget，任务继续执行
@@ -222,7 +233,7 @@ public class FocusHandler
                     {
                         await SukiMessageBox.ShowDialog(new SukiMessageBoxHost
                         {
-                            Content = displayText,
+                            Content = CreateMarkdownContent(displayText, DialogMarkdownMaxHeight),
                             ActionButtonsPreset = SukiMessageBoxButtons.OK,
                         }, new SukiMessageBoxOptions
                         {
@@ -238,7 +249,7 @@ public class FocusHandler
                     {
                         await SukiMessageBox.ShowDialog(new SukiMessageBoxHost
                         {
-                            Content = displayText,
+                            Content = CreateMarkdownContent(displayText, DialogMarkdownMaxHeight),
                             ActionButtonsPreset = SukiMessageBoxButtons.OK,
                         }, new SukiMessageBoxOptions
                         {
@@ -289,9 +300,11 @@ public class FocusHandler
                 }
                 if (focus.Toast is { Count: > 0 })
                 {
-                    var (title, _) = ParseColorText(focus.Toast[0]);
-                    var (content, _) = focus.Toast.Count >= 2 ? ParseColorText(focus.Toast[1]) : ("", "");
-                    ToastNotification.Show(HandleStringsWithVariables(title), HandleStringsWithVariables(content));
+                    var (rawTitle, _) = ParseColorText(focus.Toast[0]);
+                    var (rawContent, _) = focus.Toast.Count >= 2 ? ParseColorText(focus.Toast[1]) : ("", "");
+                    var title = ResolveLegacyFocusText(rawTitle);
+                    var content = ResolveLegacyFocusText(rawContent);
+                    ToastNotification.Show(title, CreateMarkdownContent(content, NotificationMarkdownMaxHeight));
                 }
                 if (focus.Start != null)
                 {
@@ -332,6 +345,81 @@ public class FocusHandler
         }
 
         return result;
+    }
+
+    private string ResolveFocusContent(string? template, JObject? detailsObj, MaaImageBuffer? imageBuffer = null)
+    {
+        if (string.IsNullOrWhiteSpace(template))
+            return string.Empty;
+
+        var resolved = template.ResolveContentAsync().GetAwaiter().GetResult();
+        return ReplacePlaceholders(resolved, detailsObj, imageBuffer);
+    }
+
+    private string ResolveLegacyFocusText(string? template)
+    {
+        if (string.IsNullOrWhiteSpace(template))
+            return string.Empty;
+
+        var value = HandleStringsWithVariables(template);
+        var resolved = value.ResolveContentAsync().GetAwaiter().GetResult();
+
+        // 兼容 focus 老协议里直接使用普通 i18n key 的情况。
+        if (resolved == value)
+        {
+            var localized = value.ToLocalization();
+            if (localized != value)
+                return localized;
+        }
+
+        return resolved;
+    }
+
+    private static Control CreateMarkdownContent(string markdown, double maxHeight)
+    {
+        var assetRoot = AppPaths.DataRoot;
+        var linkCommand = new MFALinkCommand
+        {
+            CurrentDocumentPath = assetRoot
+        };
+
+        var viewer = new MarkdownScrollViewer
+        {
+            Markdown = markdown,
+            Focusable = true,
+            EnableVirtualization = true,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+            MaxHeight = maxHeight,
+            Margin = new Thickness(0, 4, 0, 0),
+            Engine = new Markdown.Avalonia.Markdown
+            {
+                HyperlinkCommand = linkCommand,
+                AssetPathRoot = assetRoot,
+                StrictBoldItalic = false,
+            },
+            Plugins = CreateMarkdownPlugins(linkCommand),
+        };
+        viewer.Styles.Add(new StyleInclude(new Uri("avares://MFAAvalonia.Core/Assets/Style/MdXamlStyles.axaml"))
+        {
+            Source = new Uri("avares://MFAAvalonia.Core/Assets/Style/MdXamlStyles.axaml")
+        });
+
+        return viewer;
+    }
+
+    private static Markdown.Avalonia.MdAvPlugins CreateMarkdownPlugins(MFALinkCommand linkCommand)
+    {
+        var plugins = new Markdown.Avalonia.MdAvPlugins
+        {
+            PathResolver = new CustomPathResolver(),
+            HyperlinkCommand = linkCommand,
+        };
+        plugins.Plugins.Add(new HtmlPlugin());
+        plugins.Plugins.Add(new SvgFormat());
+        plugins.Plugins.Add(new Markdown.Avalonia.ChatAISetup());
+        plugins.Plugins.Add(new SyntaxHighlight());
+        return plugins;
     }
 
     /// <summary>
