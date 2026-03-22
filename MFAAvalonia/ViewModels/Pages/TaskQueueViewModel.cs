@@ -63,6 +63,7 @@ public partial class TaskQueueViewModel : ViewModelBase
 
         IsRunning = _processorField.TaskQueue.Count > 0;
         _processorField.TaskQueue.CountChanged += OnTaskQueueCountChanged;
+        LanguageHelper.LanguageChanged += OnLanguageChanged;
 
         // Re-initialize with the correct processor since base constructor might have used Current
         Initialize();
@@ -1197,6 +1198,20 @@ public partial class TaskQueueViewModel : ViewModelBase
                 ? LangKeys.NoEmulatorFoundPlaceholder.ToLocalization()
                 : LangKeys.NoWindowFoundPlaceholder.ToLocalization();
         }
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        DispatcherHelper.RunOnMainThread(() =>
+        {
+            OnPropertyChanged(nameof(CurrentDevicePlaceholderText));
+            OnPropertyChanged(nameof(CurrentDeviceTooltipText));
+
+            if (Devices.Count == 1 && Devices[0] is EmptyDevicePlaceholder)
+            {
+                SetEmptyDeviceState(CurrentController);
+            }
+        });
     }
 
     partial void OnCurrentControllerChanged(MaaControllerTypes value)

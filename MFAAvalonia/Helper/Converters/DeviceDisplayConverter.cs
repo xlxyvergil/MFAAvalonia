@@ -16,6 +16,8 @@ namespace MFAAvalonia.Helper.Converters;
 
 public class DeviceDisplayConverter : MarkupExtension, IValueConverter
 {
+    private const string DropdownMode = "Dropdown";
+
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -32,7 +34,9 @@ public class DeviceDisplayConverter : MarkupExtension, IValueConverter
         }
         if (value is EmptyDevicePlaceholder placeholder)
         {
-            return placeholder.SelectionText;
+            return string.Equals(parameter as string, DropdownMode, StringComparison.Ordinal)
+                ? placeholder.ListText
+                : placeholder.SelectionText;
         }
         return value?.ToString() ?? string.Empty;
     }
