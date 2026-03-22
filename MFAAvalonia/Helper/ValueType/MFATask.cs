@@ -49,8 +49,8 @@ public partial class MFATask : ObservableObject
                 token.ThrowIfCancellationRequested();
                 if (Type == MFATaskType.MAAFW)
                 {
-                    (OwnerViewModel ?? Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel)?.AddLogByKey(LangKeys.TaskStart, (Avalonia.Media.IBrush?)null, true, true, LanguageHelper.GetLocalizedString(Name));
-                    (OwnerViewModel ?? Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel)?.SetCurrentTaskName(LanguageHelper.GetLocalizedString(Name));
+                    OwnerViewModel?.AddLogByKey(LangKeys.TaskStart, (Avalonia.Media.IBrush?)null, true, true, LanguageHelper.GetLocalizedString(Name));
+                    OwnerViewModel?.SetCurrentTaskName(LanguageHelper.GetLocalizedString(Name));
                 }
                 await Action();
             }

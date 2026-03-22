@@ -253,6 +253,7 @@ public partial class RootView : SukiWindow
                                     Name = "启动前",
                                     Type = MFATask.MFATaskType.MFA,
                                     Action = async () => await vm.Processor.WaitSoftware(),
+                                    OwnerViewModel = vm,
                                 });
                             }
                             // StartupScriptOnly 或 StartupSoftwareAndScript 时启动脚本 (onlyStart = false)
@@ -296,6 +297,7 @@ public partial class RootView : SukiWindow
                                 Name = "连接检测",
                                 Type = MFATask.MFATaskType.MFA,
                                 Action = async () => await vm.Processor.TestConnecting(),
+                                OwnerViewModel = vm,
                             });
                             vm.Processor.Start(true, checkUpdate: true);
                         }

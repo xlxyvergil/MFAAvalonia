@@ -9,24 +9,86 @@ using MFAAvalonia.ViewModels.Other;
 using SukiUI.Dialogs;
 using System;
 using System.Linq;
+using System.ComponentModel;
+using MFAAvalonia.ViewModels.Pages;
 
 namespace MFAAvalonia.ViewModels.Windows;
 
 public partial class RootViewModel : ViewModelBase
 {
+    private TaskQueueViewModel? _trackedActiveTaskQueueViewModel;
+
     protected override void Initialize()
     {
-        DispatcherHelper.PostOnMainThread(CheckDebug);
+        DispatcherHelper.PostOnMainThread(() =>
+        {
+            HookActiveInstanceState();
+            CheckDebug();
+        });
     }
 
     [ObservableProperty] private bool _idle = true;
+    [ObservableProperty] private bool _currentInstanceIdle = true;
     [ObservableProperty] private bool _isWindowVisible = true;
 
     [ObservableProperty] private bool _isRunning;
 
     partial void OnIsRunningChanged(bool value)
     {
-        Idle = !value;
+        OnPropertyChanged(nameof(IsRunning));
+    }
+
+    private void HookActiveInstanceState()
+    {
+        Instances.InstanceTabBarViewModel.PropertyChanged -= OnInstanceTabBarPropertyChanged;
+        Instances.InstanceTabBarViewModel.PropertyChanged += OnInstanceTabBarPropertyChanged;
+        SubscribeToActiveTaskQueueViewModel(Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel);
+    }
+
+    private void OnInstanceTabBarPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(InstanceTabBarViewModel.ActiveTab))
+        {
+            SubscribeToActiveTaskQueueViewModel(Instances.InstanceTabBarViewModel.ActiveTab?.TaskQueueViewModel);
+        }
+    }
+
+    private void SubscribeToActiveTaskQueueViewModel(TaskQueueViewModel? taskQueueViewModel)
+    {
+        if (ReferenceEquals(_trackedActiveTaskQueueViewModel, taskQueueViewModel))
+        {
+            UpdateCurrentInstanceIdle();
+            return;
+        }
+
+        if (_trackedActiveTaskQueueViewModel != null)
+        {
+            _trackedActiveTaskQueueViewModel.PropertyChanged -= OnActiveTaskQueueViewModelPropertyChanged;
+        }
+
+        _trackedActiveTaskQueueViewModel = taskQueueViewModel;
+
+        if (_trackedActiveTaskQueueViewModel != null)
+        {
+            _trackedActiveTaskQueueViewModel.PropertyChanged += OnActiveTaskQueueViewModelPropertyChanged;
+        }
+
+        UpdateCurrentInstanceIdle();
+    }
+
+    private void OnActiveTaskQueueViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(TaskQueueViewModel.IsRunning) or nameof(TaskQueueViewModel.Idle))
+        {
+            UpdateCurrentInstanceIdle();
+        }
+    }
+
+    private void UpdateCurrentInstanceIdle()
+    {
+        var isIdle = _trackedActiveTaskQueueViewModel?.Idle ?? true;
+        CurrentInstanceIdle = isIdle;
+        Idle = isIdle;
     }
 
     public static string Version

@@ -3373,7 +3373,7 @@ public class MaaProcessor
 
     async private Task RunScript(string str = "Prescript")
     {
-        await ScriptRunner.RunScriptAsync(str);
+        await ScriptRunner.RunScriptAsync(str, InstanceConfiguration);
     }
 
     private void AddPostTasksAsync(bool onlyStart, bool checkUpdate, CancellationToken token)

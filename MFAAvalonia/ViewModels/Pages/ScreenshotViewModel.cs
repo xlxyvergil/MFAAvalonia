@@ -41,6 +41,7 @@ public partial class ScreenshotViewModel : ViewModelBase
                     Name = "截图前启动",
                     Type = MFATask.MFATaskType.MFA,
                     Action = async () => await vm.Processor.TestConnecting(),
+                    OwnerViewModel = vm,
                 });
                 vm.Processor.TaskQueue.Enqueue(new MFATask
                 {
@@ -60,6 +61,7 @@ public partial class ScreenshotViewModel : ViewModelBase
                             TaskName = string.Empty;
                         }));
                     }, name: "截图测试"),
+                    OwnerViewModel = vm,
                 });
                 vm.Processor.Start(true, checkUpdate: false);
 

@@ -17,7 +17,7 @@ public static class ScriptRunner
     /// 运行脚本（前置或后置）
     /// </summary>
     /// <param name="scriptType">脚本类型: "Prescript" 或 "Post-script"</param>
-    public static async Task RunScriptAsync(string scriptType = "Prescript")
+    public static async Task RunScriptAsync(string scriptType = "Prescript", InstanceConfiguration? instanceConfiguration = null)
     {
         var configKey = scriptType switch
         {
@@ -29,7 +29,8 @@ public static class ScriptRunner
         if (configKey == null)
             return;
 
-        var scriptPath = ConfigurationManager.CurrentInstance.GetValue(configKey, string.Empty);
+        var config = instanceConfiguration ?? ConfigurationManager.CurrentInstance;
+        var scriptPath = config.GetValue(configKey, string.Empty);
         if (string.IsNullOrWhiteSpace(scriptPath))
             return;
 
@@ -115,7 +116,8 @@ public static class ScriptRunner
         string exePath, 
         double waitTimeInSeconds, 
         CancellationToken token,
-        Action<double>? logAction = null)
+        Action<double>? logAction = null,
+        InstanceConfiguration? instanceConfiguration = null)
     {
         if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
             return null;
@@ -129,7 +131,8 @@ public static class ScriptRunner
         };
 
         Process? softwareProcess = null;
-        var emulatorConfig = ConfigurationManager.CurrentInstance.GetValue(ConfigurationKeys.EmulatorConfig, string.Empty);
+        var config = instanceConfiguration ?? ConfigurationManager.CurrentInstance;
+        var emulatorConfig = config.GetValue(ConfigurationKeys.EmulatorConfig, string.Empty);
 
         if (Process.GetProcessesByName(processName).Length == 0)
         {
