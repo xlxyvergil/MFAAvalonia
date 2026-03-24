@@ -22,6 +22,7 @@ public class MFAResxLangPlugin : ILangPlugin
     public string Mark { get; set; } = "MFAAvalonia.Assets.Localization";
     private Dictionary<Type, ResourceManager>? _resourceManagers;
     private CultureInfo? _defaultCulture;
+    private readonly object _resourceLock = new();
 
     public CultureInfo Culture
     {
@@ -87,42 +88,50 @@ public class MFAResxLangPlugin : ILangPlugin
 
     public string? GetResource(string key, string? cultureName = null)
     {
-        var culture = Culture.Name;
-
-        string? Get(string currentCulture)
+        lock (_resourceLock)
         {
-            if (Resources.TryGetValue(currentCulture, out var currentLanguages)
-                && currentLanguages.Languages.TryGetValue(key, out var resource))
+            var culture = Culture.Name;
+
+            string? Get(string currentCulture)
             {
-                return resource;
+                if (Resources.TryGetValue(currentCulture, out var currentLanguages)
+                    && currentLanguages.Languages.TryGetValue(key, out var resource))
+                {
+                    return resource;
+                }
+
+                return default;
             }
 
-            return default;
+            if (!string.IsNullOrWhiteSpace(cultureName))
+            {
+                culture = cultureName;
+            }
+
+            foreach (var candidate in GetFallbackCultures(culture))
+            {
+                if (!Resources.TryGetValue(candidate, out var cachedLanguage)
+                    || cachedLanguage.Languages.Count == 0)
+                {
+                    try
+                    {
+                        Sync(new CultureInfo(candidate));
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                }
+
+                var resource = Get(candidate);
+                if (!string.IsNullOrWhiteSpace(resource))
+                {
+                    return resource;
+                }
+            }
+
+            return key;
         }
-
-        if (!string.IsNullOrWhiteSpace(cultureName))
-        {
-            culture = cultureName;
-        }
-
-        foreach (var candidate in GetFallbackCultures(culture))
-        {
-            try
-            {
-                Sync(new CultureInfo(candidate));
-            }
-            catch
-            {
-                continue;
-            }
-            var resource = Get(candidate);
-            if (!string.IsNullOrWhiteSpace(resource))
-            {
-                return resource;
-            }
-        }
-
-        return key;
     }
 
     private IEnumerable<string> GetFallbackCultures(string culture)
@@ -178,6 +187,8 @@ public class MFAResxLangPlugin : ILangPlugin
 
     private void Sync(CultureInfo cultureInfo)
     {
+        lock (_resourceLock)
+        {
         if (_resourceManagers == null || _resourceManagers.Count == 0)
         {
             return;
@@ -233,6 +244,7 @@ public class MFAResxLangPlugin : ILangPlugin
                     currentLanResources.Languages[internedKey] = internedValue;
                 }
             }
+        }
         }
     }
 }
