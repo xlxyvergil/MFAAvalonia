@@ -558,7 +558,7 @@ public class TaskLoader(MaaInterface? maaInterface, TaskQueueViewModel taskQueue
     {
         if (!(@interface?.Option?.TryGetValue(option.Name ?? string.Empty, out var io) ?? false)) return;
         var defaultIndex = io.Cases?.FindIndex(c => c.Name == io.DefaultCase) ?? -1;
-        if (defaultIndex != -1)
+        if (defaultIndex != -1 && option.Index == null)
         {
             option.Index = defaultIndex;
         }

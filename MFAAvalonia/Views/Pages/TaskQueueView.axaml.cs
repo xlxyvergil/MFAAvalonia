@@ -40,6 +40,7 @@ using SukiUI.Dialogs;
 using SukiUI.Controls;
 using SukiUI.Extensions;
 using System.Threading.Tasks;
+using System.Collections.Specialized;
 
 namespace MFAAvalonia.Views.Pages;
 
@@ -102,6 +103,7 @@ public partial class TaskQueueView : UserControl
         {
             _subscribedViewModel.PropertyChanged -= OnTaskQueueViewModelPropertyChanged;
             _subscribedViewModel.SetOptionRequested -= OnSetOptionRequested;
+            _subscribedViewModel.TaskItemViewModels.CollectionChanged -= OnTaskItemsCollectionChanged;
         }
 
         _subscribedViewModel = newVm;
@@ -110,7 +112,14 @@ public partial class TaskQueueView : UserControl
         {
             _subscribedViewModel.PropertyChanged += OnTaskQueueViewModelPropertyChanged;
             _subscribedViewModel.SetOptionRequested += OnSetOptionRequested;
+            _subscribedViewModel.TaskItemViewModels.CollectionChanged += OnTaskItemsCollectionChanged;
+            Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
         }
+    }
+
+    private void OnTaskItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
     }
 
 // private void UpdateDeviceSelectorLayout()
@@ -647,6 +656,7 @@ public partial class TaskQueueView : UserControl
         }
 
         HideAllPanels();
+        InvalidatePanelCache(cacheKey);
         var juggle = dragItem.InterfaceItem is { Advanced: { Count: > 0 }, Option: { Count: > 0 } };
         vm.ShowSettings = juggle;
         // 处理资源设置项的选项
@@ -919,6 +929,21 @@ public partial class TaskQueueView : UserControl
 
         Introduction.Markdown = "";
         SetHiddenMode();
+    }
+
+    private void InvalidatePanelCache(string key)
+    {
+        if (CommonPanelCache.TryRemove(key, out var commonPanel))
+        {
+            CommonOptionSettings.Children.Remove(commonPanel);
+        }
+
+        if (AdvancedPanelCache.TryRemove(key, out var advancedPanel))
+        {
+            AdvancedOptionSettings.Children.Remove(advancedPanel);
+        }
+
+        IntroductionsCache.TryRemove(key, out _);
     }
 
     private void HideAllPanels()
@@ -2273,8 +2298,13 @@ public partial class TaskQueueView : UserControl
 
         combo.SelectionChanged += (_, _) =>
         {
-            option.Index = combo.SelectedIndex;
-            UpdateSubOptions(combo.SelectedIndex);
+            var selectedCase = combo.SelectedItem as MaaInterface.MaaInterfaceOptionCase;
+            var resolvedIndex = selectedCase != null && interfaceOption.Cases != null
+                ? interfaceOption.Cases.FindIndex(c => c.Name == selectedCase.Name)
+                : combo.SelectedIndex;
+
+            option.Index = resolvedIndex;
+            UpdateSubOptions(resolvedIndex);
             SaveConfiguration();
         };
 

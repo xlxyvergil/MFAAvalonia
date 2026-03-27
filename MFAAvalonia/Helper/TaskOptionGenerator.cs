@@ -748,8 +748,13 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
 
         comboBox.SelectionChanged += (_, _) =>
         {
-            option.Index = comboBox.SelectedIndex;
-            UpdateSubOptions(comboBox.SelectedIndex);
+            var selectedCase = comboBox.SelectedItem as MaaInterface.MaaInterfaceOptionCase;
+            var resolvedIndex = selectedCase != null && interfaceOption.Cases != null
+                ? interfaceOption.Cases.FindIndex(c => c.Name == selectedCase.Name)
+                : comboBox.SelectedIndex;
+
+            option.Index = resolvedIndex;
+            UpdateSubOptions(resolvedIndex);
             saveConfigurationAction();
         };
         

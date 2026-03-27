@@ -2789,15 +2789,12 @@ public class MaaProcessor
         {
             foreach (var selectAdvanced in advanceds)
             {
-                if (string.IsNullOrWhiteSpace(selectAdvanced.PipelineOverride) || selectAdvanced.PipelineOverride == "{}")
+                if (Interface?.Advanced?.TryGetValue(selectAdvanced.Name ?? string.Empty, out var interfaceAdvanced) == true)
                 {
-                    if (Interface?.Advanced?.TryGetValue(selectAdvanced.Name ?? string.Empty, out var interfaceAdvanced) == true)
-                    {
-                        var inputValues = selectAdvanced.Data
-                            .Where(kv => kv.Value != null)
-                            .ToDictionary(kv => kv.Key, kv => kv.Value!);
-                        selectAdvanced.PipelineOverride = interfaceAdvanced.GenerateProcessedPipeline(inputValues);
-                    }
+                    var inputValues = selectAdvanced.Data
+                        .Where(kv => kv.Value != null)
+                        .ToDictionary(kv => kv.Key, kv => kv.Value!);
+                    selectAdvanced.PipelineOverride = interfaceAdvanced.GenerateProcessedPipeline(inputValues);
                 }
 
                 if (!string.IsNullOrWhiteSpace(selectAdvanced.PipelineOverride) && selectAdvanced.PipelineOverride != "{}")
@@ -2917,9 +2914,6 @@ public class MaaProcessor
             // 处理 input 类型
             else if (interfaceOption.IsInput)
             {
-                // 从 Data 重新生成 PipelineOverride（因为 PipelineOverride 是 JsonIgnore 的）
-                string? pipelineOverride = selectOption.PipelineOverride;
-
                 if ((selectOption.Data == null || selectOption.Data.Count == 0) && interfaceOption.Inputs is { Count: > 0 })
                 {
                     selectOption.Data = interfaceOption.Inputs
@@ -2927,14 +2921,14 @@ public class MaaProcessor
                         .ToDictionary(input => input.Name!, input => input.Default ?? string.Empty);
                 }
 
-                if ((string.IsNullOrWhiteSpace(pipelineOverride) || pipelineOverride == "{}")
-                    && selectOption.Data != null
-                    && interfaceOption.PipelineOverride != null)
+                // 运行前始终按最新 Data 重建，避免 UI 某些路径未刷新缓存时继续使用旧值。
+                string? pipelineOverride = selectOption.PipelineOverride;
+                if (selectOption.Data != null && interfaceOption.PipelineOverride != null)
                 {
-                    // 从 Data 重新生成
                     pipelineOverride = interfaceOption.GenerateProcessedPipeline(
                         selectOption.Data.Where(kv => kv.Value != null)
                             .ToDictionary(kv => kv.Key, kv => kv.Value!));
+                    selectOption.PipelineOverride = pipelineOverride;
                 }
 
                 if (!string.IsNullOrWhiteSpace(pipelineOverride) && pipelineOverride != "{}")
