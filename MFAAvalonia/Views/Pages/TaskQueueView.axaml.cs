@@ -164,7 +164,49 @@ public partial class TaskQueueView : UserControl
     {
         if (sender is ListBox { SelectedItem: DragItemViewModel itemViewModel })
         {
+            if (!itemViewModel.IsTaskSupported)
+            {
+                itemViewModel.EnableSetting = false;
+                Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
+                return;
+            }
+
             itemViewModel.EnableSetting = true;
+        }
+    }
+
+    private void ClearUnsupportedSelection()
+    {
+        UpdateTaskItemContainerVisibility();
+
+        if (TaskListBox?.SelectedItem is not DragItemViewModel selectedItem || selectedItem.IsTaskSupported)
+        {
+            return;
+        }
+
+        selectedItem.EnableSetting = false;
+
+        var fallbackItem = (DataContext as TaskQueueViewModel)?.TaskItemViewModels
+            .FirstOrDefault(item => item.IsTaskSupported);
+
+        TaskListBox.SelectedItem = fallbackItem;
+
+        if (fallbackItem != null)
+        {
+            fallbackItem.EnableSetting = true;
+        }
+    }
+
+    private void UpdateTaskItemContainerVisibility()
+    {
+        if (TaskListBox == null)
+        {
+            return;
+        }
+
+        foreach (var container in TaskListBox.GetVisualDescendants().OfType<ListBoxItem>())
+        {
+            container.IsVisible = container.DataContext is not DragItemViewModel item || item.IsTaskSupported;
         }
     }
 
@@ -2759,12 +2801,14 @@ public partial class TaskQueueView : UserControl
             UpdateDeviceColumns();
             // 控制器类型变化时，清空选项面板缓存，确保重新生成时应用新的过滤条件
             ClearOptionPanelCaches();
+            Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
         }
 
         if (e.PropertyName == nameof(TaskQueueViewModel.CurrentResource))
         {
             // 资源变化时，清空选项面板缓存，确保重新生成时应用新的过滤条件
             ClearOptionPanelCaches();
+            Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
         }
     }
 
@@ -2787,6 +2831,7 @@ public partial class TaskQueueView : UserControl
 
         TopToolbar.SizeChanged += OnTopToolbarSizeChanged;
         Dispatcher.UIThread.Post(() => UpdateTopToolbarLayout(true), DispatcherPriority.Render);
+        Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
 
         LanguageHelper.LanguageChanged -= OnLanguageChanged;
         LanguageHelper.LanguageChanged += OnLanguageChanged;
