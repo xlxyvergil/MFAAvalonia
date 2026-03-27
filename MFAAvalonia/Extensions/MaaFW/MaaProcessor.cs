@@ -2649,21 +2649,43 @@ public class MaaProcessor
             List<DragItemViewModel> tasks;
             if (dragItemViewModels == null)
             {
-                // 排除不支持当前资源包/控制器的任务（IsTaskSupported 为 false 的任务）
-                // 排除 resource option 项（它们不参与任务执行，只提供参数）
-                tasks = ViewModel?.TaskItemViewModels.ToList()
-                        .FindAll(task => (task.IsChecked || task.IsCheckedWithNull == null) && task.IsTaskSupported && !task.IsResourceOptionItem)
-                    ?? new List<DragItemViewModel>();
+                tasks = FilterExecutableTasks(ViewModel?.TaskItemViewModels);
             }
             else
             {
-                tasks = dragItemViewModels;
+                tasks = FilterExecutableTasks(dragItemViewModels);
             }
 
             _ = StartTask(tasks, onlyStart, checkUpdate);
         }
 
         return Task.CompletedTask;
+    }
+
+    private List<DragItemViewModel> FilterExecutableTasks(IEnumerable<DragItemViewModel>? source)
+    {
+        var currentResourceName = ViewModel?.CurrentResource;
+        var currentControllerName = ViewModel?.GetCurrentControllerName();
+
+        return source?
+                   .Where(task =>
+                   {
+                       if (task.IsResourceOptionItem)
+                       {
+                           return false;
+                       }
+
+                       var isSupported = task.SupportsResource(currentResourceName)
+                                         && task.SupportsController(currentControllerName);
+
+                       task.IsResourceSupported = task.SupportsResource(currentResourceName);
+                       task.IsControllerSupported = task.SupportsController(currentControllerName);
+                       task.IsTaskSupported = isSupported;
+
+                       return (task.IsChecked || task.IsCheckedWithNull == null) && isSupported;
+                   })
+                   .ToList()
+                    ?? new List<DragItemViewModel>();
     }
 
     public CancellationTokenSource? CancellationTokenSource
