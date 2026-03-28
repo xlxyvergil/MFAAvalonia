@@ -188,14 +188,31 @@ public partial class TaskQueueView : UserControl
     {
         UpdateTaskItemContainerVisibility();
 
-        if (TaskListBox?.SelectedItem is not DragItemViewModel selectedItem || selectedItem.IsTaskSupported)
+        if (DataContext is not TaskQueueViewModel vm || TaskListBox == null)
+        {
+            return;
+        }
+
+        if (TaskListBox.SelectedItem is not DragItemViewModel selectedItem)
+        {
+            var initialItem = vm.TaskItemViewModels.FirstOrDefault(item => item.EnableSetting && (item.IsResourceOptionItem || item.IsTaskSupported))
+                ?? vm.TaskItemViewModels.FirstOrDefault(item => item.IsTaskSupported);
+            if (initialItem != null)
+            {
+                TaskListBox.SelectedItem = initialItem;
+                initialItem.EnableSetting = true;
+            }
+            return;
+        }
+
+        if (selectedItem.IsTaskSupported)
         {
             return;
         }
 
         selectedItem.EnableSetting = false;
 
-        var fallbackItem = (DataContext as TaskQueueViewModel)?.TaskItemViewModels
+        var fallbackItem = vm.TaskItemViewModels
             .FirstOrDefault(item => item.IsTaskSupported);
 
         TaskListBox.SelectedItem = fallbackItem;
@@ -2832,6 +2849,7 @@ public partial class TaskQueueView : UserControl
             // 控制器类型变化时，清空选项面板缓存，确保重新生成时应用新的过滤条件
             ClearOptionPanelCaches();
             Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(ReopenActiveTaskPanel, DispatcherPriority.Background);
         }
 
         if (e.PropertyName == nameof(TaskQueueViewModel.CurrentResource))
@@ -2839,6 +2857,7 @@ public partial class TaskQueueView : UserControl
             // 资源变化时，清空选项面板缓存，确保重新生成时应用新的过滤条件
             ClearOptionPanelCaches();
             Dispatcher.UIThread.Post(ClearUnsupportedSelection, DispatcherPriority.Background);
+            Dispatcher.UIThread.Post(ReopenActiveTaskPanel, DispatcherPriority.Background);
         }
     }
 
@@ -2853,6 +2872,34 @@ public partial class TaskQueueView : UserControl
         CommonOptionSettings?.Children.Clear();
         AdvancedOptionSettings?.Children.Clear();
         Introduction.Markdown = "";
+    }
+
+    private void ReopenActiveTaskPanel()
+    {
+        if (DataContext is not TaskQueueViewModel vm)
+        {
+            return;
+        }
+
+        var currentItem = TaskListBox?.SelectedItem as DragItemViewModel
+            ?? vm.TaskItemViewModels.FirstOrDefault(item => item.EnableSetting);
+        if (currentItem == null)
+        {
+            return;
+        }
+
+        if (!currentItem.IsResourceOptionItem && !currentItem.IsTaskSupported)
+        {
+            return;
+        }
+
+        if (!currentItem.EnableSetting)
+        {
+            currentItem.EnableSetting = true;
+            return;
+        }
+
+        SetOption(currentItem, true);
     }
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
