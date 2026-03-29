@@ -25,6 +25,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Bitmap = Avalonia.Media.Imaging.Bitmap;
 using Brushes = Avalonia.Media.Brushes;
