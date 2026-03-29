@@ -182,6 +182,11 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
             // checkbox 类型：多选 ToggleButton 列表（任务 8）
             control = CreateCheckboxControl(option, interfaceOption, source);
         }
+        else if (interfaceOption.IsScanSelect)
+        {
+            // scan_select 类型：带刷新按钮的下拉选择框
+            control = CreateScanSelectControl(option, interfaceOption, source);
+        }
         else if ((interfaceOption.IsSwitch && interfaceOption.Cases.ShouldSwitchButton(out var yes, out var no)) ||
                  interfaceOption.Cases.ShouldSwitchButton(out yes, out no)) // Try both conditions with/without type checking logic
         {
@@ -893,6 +898,8 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
             control = CreateInputControl(subOption, subInterfaceOption);
          else if (subInterfaceOption.IsCheckbox)
             control = CreateCheckboxControl(subOption, subInterfaceOption, source);
+         else if (subInterfaceOption.IsScanSelect)
+            control = CreateScanSelectControl(subOption, subInterfaceOption, source);
          else if ((subInterfaceOption.IsSwitch && subInterfaceOption.Cases.ShouldSwitchButton(out var yes, out var no)) ||
                   subInterfaceOption.Cases.ShouldSwitchButton(out yes, out no))
             control = CreateToggleControl(subOption, yes, no, subInterfaceOption, source);
@@ -900,6 +907,335 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
             control = CreateComboBoxControl(subOption, subInterfaceOption, source);
 
          container.Children.Add(control);
+    }
+
+    /// <summary>
+    /// 创建 scan_select 类型的控件（带刷新按钮的下拉选择框）
+    /// </summary>
+    private Control CreateScanSelectControl(
+        MaaInterface.MaaInterfaceSelectOption option,
+        MaaInterface.MaaInterfaceOption interfaceOption,
+        DragItemViewModel source)
+    {
+        var wrapper = new StackPanel();
+        var grid = CreateBaseGrid();
+
+        interfaceOption.InitializeIcon();
+
+        // 首次扫描目录加载选项
+        ScanDirectory(interfaceOption);
+
+        var comboBox = new ComboBox
+        {
+            MinWidth = 120,
+            Classes = { "LimitWidth" },
+            Margin = new Thickness(0, 2, 0, 2),
+            ItemsSource = interfaceOption.Cases,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+        // 设置选中项
+        if (interfaceOption.Cases != null && interfaceOption.Cases.Count > 0)
+        {
+            var selectedIndex = option.Index ?? 0;
+            if (selectedIndex >= 0 && selectedIndex < interfaceOption.Cases.Count)
+            {
+                comboBox.SelectedIndex = selectedIndex;
+            }
+            else
+            {
+                comboBox.SelectedIndex = 0;
+                option.Index = 0;
+            }
+        }
+
+        BindIdleEnabled(comboBox);
+        SetupComboBoxTemplate(comboBox);
+
+        // Sub-options container
+        var subOptionsContainer = new StackPanel();
+
+        void UpdateSubOptions(int index)
+        {
+            subOptionsContainer.Children.Clear();
+            if (interfaceOption.Cases == null || index < 0 || index >= interfaceOption.Cases.Count) return;
+
+            var selectedCase = interfaceOption.Cases[index];
+            if (selectedCase.Option == null || selectedCase.Option.Count == 0) return;
+
+            option.SubOptions ??= new List<MaaInterface.MaaInterfaceSelectOption>();
+
+            foreach (var subOptionName in selectedCase.Option)
+            {
+                var existing = option.SubOptions.FirstOrDefault(o => o.Name == subOptionName);
+                if (existing == null)
+                {
+                    existing = CreateDefaultSelectOption(subOptionName);
+                    option.SubOptions.Add(existing);
+                }
+                AddSubOption(subOptionsContainer, existing, source);
+            }
+        }
+
+        comboBox.SelectionChanged += (_, _) =>
+        {
+            var selectedCase = comboBox.SelectedItem as MaaInterface.MaaInterfaceOptionCase;
+            var resolvedIndex = selectedCase != null && interfaceOption.Cases != null
+                ? interfaceOption.Cases.FindIndex(c => c.Name == selectedCase.Name)
+                : comboBox.SelectedIndex;
+
+            option.Index = resolvedIndex;
+            UpdateSubOptions(resolvedIndex);
+            saveConfigurationAction();
+        };
+
+        UpdateSubOptions(option.Index ?? 0);
+        ComboBoxExtensions.SetDisableNavigationOnLostFocus(comboBox, true);
+        ComboBoxExtensions.SetCanSearch(comboBox, true);
+        ComboBoxExtensions.SetSearchMemberPath(comboBox, "DisplayName");
+        comboBox.Bind(ComboBoxExtensions.SearchWatermarkProperty, new I18nBinding(LangKeys.Search));
+
+        // 刷新按钮
+        var refreshButton = new Button
+        {
+            Margin = new Thickness(4, 0, 0, 0),
+            Padding = new Thickness(6),
+            VerticalAlignment = VerticalAlignment.Center,
+            Content = new FluentIcons.Avalonia.Fluent.FluentIcon
+            {
+                Icon = FluentIcons.Common.Icon.ArrowSync,
+                IconSize = FluentIcons.Common.IconSize.Size16,
+            }
+        };
+        BindIdleEnabled(refreshButton);
+
+        refreshButton.Click += (_, _) =>
+        {
+            // 保存当前选中的值
+            var previousSelectedCase = comboBox.SelectedItem as MaaInterface.MaaInterfaceOptionCase;
+            var previousValue = previousSelectedCase?.Name;
+
+            // 重新扫描目录
+            ScanDirectory(interfaceOption);
+
+            // 刷新 ComboBox 的 ItemsSource
+            comboBox.ItemsSource = null;
+            comboBox.ItemsSource = interfaceOption.Cases;
+
+            // 尝试恢复之前的选择
+            if (previousValue != null && interfaceOption.Cases != null)
+            {
+                var newIndex = interfaceOption.Cases.FindIndex(c => c.Name == previousValue);
+                if (newIndex >= 0)
+                {
+                    comboBox.SelectedIndex = newIndex;
+                    option.Index = newIndex;
+                }
+                else if (interfaceOption.Cases.Count > 0)
+                {
+                    // 如果之前的选择已不存在，默认选择第一个
+                    comboBox.SelectedIndex = 0;
+                    option.Index = 0;
+                }
+            }
+            else if (interfaceOption.Cases != null && interfaceOption.Cases.Count > 0)
+            {
+                comboBox.SelectedIndex = 0;
+                option.Index = 0;
+            }
+
+            UpdateSubOptions(option.Index ?? 0);
+            saveConfigurationAction();
+        };
+
+        // 使用 StackPanel 放置 ComboBox 和刷新按钮
+        var inputPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        inputPanel.Children.Add(comboBox);
+        inputPanel.Children.Add(refreshButton);
+
+        // Header
+        var labelPanel = CreateLabelPanel(option.DisplayName, option.Name, interfaceOption.Description, interfaceOption.Document);
+        var icon = CreateIcon(interfaceOption);
+        icon.Margin = new Thickness(10, 0, 6, 0);
+        labelPanel.Children.Insert(0, icon);
+
+        Grid.SetColumn(labelPanel, 0);
+        Grid.SetColumn(inputPanel, 1);
+
+        AddResponsiveBehavior(grid, labelPanel, inputPanel);
+
+        grid.Children.Add(labelPanel);
+        grid.Children.Add(inputPanel);
+
+        wrapper.Children.Add(grid);
+
+        // Sub-options border
+        var subOptionsBorder = new Border
+        {
+            BorderThickness = new Thickness(2, 0, 0, 0),
+            Margin = new Thickness(24, 0, 0, 4),
+            Padding = new Thickness(8, 0, 0, 0),
+            Child = subOptionsContainer
+        };
+        subOptionsBorder.Bind(Border.BorderBrushProperty, new DynamicResourceExtension("SukiPrimaryColor"));
+        subOptionsBorder.Bind(Visual.IsVisibleProperty, new Binding("Children.Count")
+        {
+            Source = subOptionsContainer,
+            Converter = new FuncValueConverter<int, bool>(count => count > 0)
+        });
+
+        wrapper.Children.Add(subOptionsBorder);
+
+        return wrapper;
+    }
+
+    /// <summary>
+    /// 扫描目录并根据 filter 更新 interfaceOption.Cases
+    /// </summary>
+    private void ScanDirectory(MaaInterface.MaaInterfaceOption interfaceOption)
+    {
+        if (string.IsNullOrEmpty(interfaceOption.ScanDir) || string.IsNullOrEmpty(interfaceOption.ScanFilter))
+            return;
+
+        try
+        {
+            var basePath = MaaProcessor.ResourceBase;
+            var scanPath = interfaceOption.ScanDir.Replace("{PROJECT_DIR}", basePath);
+            scanPath = Path.GetFullPath(scanPath);
+
+            if (!Directory.Exists(scanPath))
+            {
+                LoggerHelper.Warning($"Scan directory does not exist: {scanPath}");
+                interfaceOption.Cases ??= new List<MaaInterface.MaaInterfaceOptionCase>();
+                return;
+            }
+
+            var files = EnumerateFilesWithGlob(scanPath, interfaceOption.ScanFilter);
+            var newCases = new List<MaaInterface.MaaInterfaceOptionCase>();
+
+            foreach (var file in files.OrderBy(f => f))
+            {
+                var fileName = Path.GetFileName(file);
+                var caseItem = new MaaInterface.MaaInterfaceOptionCase
+                {
+                    Name = fileName,
+                    Label = fileName
+                };
+                newCases.Add(caseItem);
+            }
+
+            interfaceOption.Cases = newCases;
+
+            // 初始化所有 case 的显示名称
+            foreach (var caseItem in interfaceOption.Cases)
+            {
+                caseItem.InitializeDisplayName();
+            }
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Error($"Failed to scan directory: {ex.Message}");
+            interfaceOption.Cases ??= new List<MaaInterface.MaaInterfaceOptionCase>();
+        }
+    }
+
+    /// <summary>
+    /// 使用 glob 模式枚举文件
+    /// </summary>
+    private List<string> EnumerateFilesWithGlob(string basePath, string pattern)
+    {
+        var results = new List<string>();
+
+        // 处理 ** 递归模式
+        if (pattern.Contains("**/"))
+        {
+            var parts = pattern.Split(new[] { "**/" }, StringSplitOptions.None);
+            if (parts.Length == 2)
+            {
+                var baseDir = parts[0];
+                var filePattern = parts[1];
+
+                var searchPath = string.IsNullOrEmpty(baseDir)
+                    ? basePath
+                    : Path.Combine(basePath, baseDir);
+
+                if (Directory.Exists(searchPath))
+                {
+                    // 递归搜索所有子目录
+                    var allFiles = Directory.EnumerateFiles(searchPath, "*", SearchOption.AllDirectories);
+                    foreach (var file in allFiles)
+                    {
+                        var fileName = Path.GetFileName(file);
+                        if (MatchesGlobPattern(fileName, filePattern))
+                        {
+                            results.Add(file);
+                        }
+                    }
+                }
+            }
+        }
+        else if (pattern.Contains("*"))
+        {
+            // 处理包含通配符的目录路径，如 "settings/*.json"
+            var dirPart = Path.GetDirectoryName(pattern) ?? "";
+            var filePart = Path.GetFileName(pattern);
+
+            if (string.IsNullOrEmpty(dirPart))
+            {
+                // 当前目录
+                if (Directory.Exists(basePath))
+                {
+                    results.AddRange(Directory.EnumerateFiles(basePath, filePart));
+                }
+            }
+            else
+            {
+                // 子目录
+                var searchPath = Path.Combine(basePath, dirPart);
+                if (Directory.Exists(searchPath))
+                {
+                    results.AddRange(Directory.EnumerateFiles(searchPath, filePart));
+                }
+            }
+        }
+        else
+        {
+            // 简单模式，直接搜索
+            if (Directory.Exists(basePath))
+            {
+                results.AddRange(Directory.EnumerateFiles(basePath, pattern));
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// 检查文件名是否匹配 glob 模式
+    /// </summary>
+    private bool MatchesGlobPattern(string fileName, string pattern)
+    {
+        // 将 glob 模式转换为正则表达式
+        var regexPattern = pattern
+            .Replace(".", "\\.")
+            .Replace("*", ".*")
+            .Replace("?", ".");
+
+        regexPattern = "^" + regexPattern + "$";
+
+        try
+        {
+            return Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase);
+        }
+        catch
+        {
+            // 如果正则表达式无效，使用简单的字符串比较
+            return fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     // Helper Creation Methods

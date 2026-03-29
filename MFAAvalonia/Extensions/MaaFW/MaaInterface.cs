@@ -248,6 +248,18 @@ public partial class MaaInterface
         [JsonIgnore]
         public bool IsCheckbox => OptionType == "checkbox";
 
+        /// <summary>是否为 scan_select 扫描选择类型</summary>
+        [JsonIgnore]
+        public bool IsScanSelect => OptionType == "scan_select";
+
+        /// <summary>扫描目录路径（用于 scan_select 类型）</summary>
+        [JsonProperty("scan_dir")]
+        public string? ScanDir { get; set; }
+
+        /// <summary>扫描文件过滤器，支持 glob 模式（用于 scan_select 类型）</summary>
+        [JsonProperty("scan_filter")]
+        public string? ScanFilter { get; set; }
+
         /// <summary>解析后的图标路径（用于 UI 绑定）</summary>
         [ObservableProperty] [JsonIgnore] private string? _resolvedIcon;
 
@@ -534,6 +546,104 @@ public partial class MaaInterface
              if (other.DefaultCases != null && other.DefaultCases.Count > 0) DefaultCases = other.DefaultCases;
              if (other.Controller != null) Controller = other.Controller;
              if (other.Resource != null) Resource = other.Resource;
+             if (!string.IsNullOrEmpty(other.ScanDir)) ScanDir = other.ScanDir;
+             if (!string.IsNullOrEmpty(other.ScanFilter)) ScanFilter = other.ScanFilter;
+        }
+
+        /// <summary>
+        /// 为 scan_select 类型生成处理后的 pipeline override
+        /// 将 pipeline_override 中的 {option_name} 占位符替换为选中的值
+        /// </summary>
+        /// <param name="selectedValue">选中的 case 名称</param>
+        /// <returns>处理后的 pipeline override JSON 字符串</returns>
+        public string GenerateScanSelectProcessedPipeline(string selectedValue)
+        {
+            if (PipelineOverride == null || !IsScanSelect) return "{}";
+
+            var placeholder = $"{{{Name}}}";
+            var cloned = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, JToken>>>(
+                JsonConvert.SerializeObject(PipelineOverride)
+            );
+
+            if (cloned == null) return "{}";
+
+            foreach (var preset in cloned.Values)
+            {
+                foreach (var key in preset.Keys.ToList())
+                {
+                    var jToken = preset[key];
+                    var newToken = ProcessScanSelectToken(jToken, placeholder, selectedValue);
+                    if (newToken != null)
+                    {
+                        preset[key] = newToken;
+                    }
+                }
+            }
+
+            return JsonConvert.SerializeObject(cloned, Formatting.Indented);
+        }
+
+        private JToken? ProcessScanSelectToken(JToken? token, string placeholder, string selectedValue)
+        {
+            if (token == null) return null;
+
+            return token.Type switch
+            {
+                JTokenType.String => ProcessScanSelectStringToken(token, placeholder, selectedValue),
+                JTokenType.Array => ProcessScanSelectArrayToken(token, placeholder, selectedValue),
+                JTokenType.Object => ProcessScanSelectObjectToken(token, placeholder, selectedValue),
+                _ => token
+            };
+        }
+
+        private JToken? ProcessScanSelectStringToken(JToken token, string placeholder, string selectedValue)
+        {
+            var strVal = token.Value<string>();
+            if (string.IsNullOrEmpty(strVal)) return token;
+
+            // 替换占位符
+            if (strVal == placeholder)
+            {
+                return JToken.FromObject(selectedValue);
+            }
+
+            if (strVal.Contains(placeholder))
+            {
+                var newVal = strVal.Replace(placeholder, selectedValue);
+                return JToken.FromObject(newVal);
+            }
+
+            return token;
+        }
+
+        private JToken ProcessScanSelectArrayToken(JToken token, string placeholder, string selectedValue)
+        {
+            var arr = (JArray)token;
+            var newArr = new JArray();
+            foreach (var item in arr)
+            {
+                var processedItem = ProcessScanSelectToken(item, placeholder, selectedValue);
+                if (processedItem != null)
+                {
+                    newArr.Add(processedItem);
+                }
+            }
+            return newArr;
+        }
+
+        private JToken ProcessScanSelectObjectToken(JToken token, string placeholder, string selectedValue)
+        {
+            var obj = (JObject)token;
+            var newObj = new JObject();
+            foreach (var property in obj.Properties())
+            {
+                var processedValue = ProcessScanSelectToken(property.Value, placeholder, selectedValue);
+                if (processedValue != null)
+                {
+                    newObj[property.Name] = processedValue;
+                }
+            }
+            return newObj;
         }
     }
 
