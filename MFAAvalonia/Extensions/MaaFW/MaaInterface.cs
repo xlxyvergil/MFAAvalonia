@@ -552,7 +552,7 @@ public partial class MaaInterface
 
         /// <summary>
         /// 为 scan_select 类型生成处理后的 pipeline override
-        /// 将 pipeline_override 中的 {option_name} 占位符替换为选中的值
+        /// 递归遍历 pipeline_override，对所有 attach.option_name 键赋值选中值
         /// </summary>
         /// <param name="selectedValue">选中的 case 名称</param>
         /// <returns>处理后的 pipeline override JSON 字符串</returns>
@@ -560,7 +560,6 @@ public partial class MaaInterface
         {
             if (PipelineOverride == null || !IsScanSelect) return "{}";
 
-            var placeholder = $"{{{Name}}}";
             var cloned = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, JToken>>>(
                 JsonConvert.SerializeObject(PipelineOverride)
             );
@@ -569,81 +568,43 @@ public partial class MaaInterface
 
             foreach (var preset in cloned.Values)
             {
-                foreach (var key in preset.Keys.ToList())
-                {
-                    var jToken = preset[key];
-                    var newToken = ProcessScanSelectToken(jToken, placeholder, selectedValue);
-                    if (newToken != null)
-                    {
-                        preset[key] = newToken;
-                    }
-                }
+                ProcessScanSelectPreset(preset, selectedValue);
             }
 
             return JsonConvert.SerializeObject(cloned, Formatting.Indented);
         }
 
-        private JToken? ProcessScanSelectToken(JToken? token, string placeholder, string selectedValue)
+        /// <summary>
+        /// 处理 preset 对象，递归查找并更新 attach.option_name
+        /// </summary>
+        private void ProcessScanSelectPreset(Dictionary<string, JToken> preset, string selectedValue)
         {
-            if (token == null) return null;
-
-            return token.Type switch
+            foreach (var key in preset.Keys.ToList())
             {
-                JTokenType.String => ProcessScanSelectStringToken(token, placeholder, selectedValue),
-                JTokenType.Array => ProcessScanSelectArrayToken(token, placeholder, selectedValue),
-                JTokenType.Object => ProcessScanSelectObjectToken(token, placeholder, selectedValue),
-                _ => token
-            };
-        }
-
-        private JToken? ProcessScanSelectStringToken(JToken token, string placeholder, string selectedValue)
-        {
-            var strVal = token.Value<string>();
-            if (string.IsNullOrEmpty(strVal)) return token;
-
-            // 替换占位符
-            if (strVal == placeholder)
-            {
-                return JToken.FromObject(selectedValue);
-            }
-
-            if (strVal.Contains(placeholder))
-            {
-                var newVal = strVal.Replace(placeholder, selectedValue);
-                return JToken.FromObject(newVal);
-            }
-
-            return token;
-        }
-
-        private JToken ProcessScanSelectArrayToken(JToken token, string placeholder, string selectedValue)
-        {
-            var arr = (JArray)token;
-            var newArr = new JArray();
-            foreach (var item in arr)
-            {
-                var processedItem = ProcessScanSelectToken(item, placeholder, selectedValue);
-                if (processedItem != null)
+                var jToken = preset[key];
+                if (key == "attach" && jToken.Type == JTokenType.Object)
                 {
-                    newArr.Add(processedItem);
+                    var attachObj = (JObject)jToken;
+                    if (attachObj.ContainsKey(Name))
+                    {
+                        attachObj[Name] = JToken.FromObject(selectedValue);
+                    }
+                }
+                else if (jToken.Type == JTokenType.Object)
+                {
+                    var nestedObj = (JObject)jToken;
+                    var nestedDict = nestedObj.ToObject<Dictionary<string, JToken>>();
+                    if (nestedDict != null)
+                    {
+                        ProcessScanSelectPreset(nestedDict, selectedValue);
+                        // 更新原对象
+                        foreach (var nestedKey in nestedDict.Keys.ToList())
+                        {
+                            nestedObj[nestedKey] = nestedDict[nestedKey];
+                        }
+                    }
                 }
             }
-            return newArr;
-        }
-
-        private JToken ProcessScanSelectObjectToken(JToken token, string placeholder, string selectedValue)
-        {
-            var obj = (JObject)token;
-            var newObj = new JObject();
-            foreach (var property in obj.Properties())
-            {
-                var processedValue = ProcessScanSelectToken(property.Value, placeholder, selectedValue);
-                if (processedValue != null)
-                {
-                    newObj[property.Name] = processedValue;
-                }
-            }
-            return newObj;
         }
     }
 
