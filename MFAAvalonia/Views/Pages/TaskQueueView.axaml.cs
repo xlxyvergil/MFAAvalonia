@@ -470,7 +470,7 @@ public partial class TaskQueueView : UserControl
         {
             if (taskItemViewModel.IsResourceOptionItem)
                 return;
-            vm.Processor.Start([taskItemViewModel]);
+            vm.Processor.Start([taskItemViewModel], ignoreCheckedState: true);
         }
     }
 
@@ -492,16 +492,18 @@ public partial class TaskQueueView : UserControl
             if (currentTaskIndex < 0)
                 return;
 
-            // 筛选：从当前任务开始，往后所有 IsChecked = true 且支持当前资源包的任务
+            var currentTask = vm.TaskItemViewModels[currentTaskIndex];
+
+            // 当前任务始终执行；后续任务仍然要求已勾选且支持当前资源包/控制器。
             var tasksToRun = vm.TaskItemViewModels
-                .Skip(currentTaskIndex) // 跳过当前任务之前的所有项
-                .Where(task => task.IsChecked && task.IsTaskSupported) // 只保留已勾选且支持当前资源包/控制器的任务
+                .Skip(currentTaskIndex)
+                .Where(task => (ReferenceEquals(task, currentTask) || task.IsChecked) && task.IsTaskSupported)
                 .ToList(); // 转为列表（避免枚举多次）
 
             // 有需要运行的任务才调用 Start（避免空集合无效调用）
             if (tasksToRun.Any())
             {
-                vm.Processor.Start(tasksToRun);
+                vm.Processor.Start(tasksToRun, ignoreCheckedState: true);
             }
         }
     }

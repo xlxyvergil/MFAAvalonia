@@ -2633,12 +2633,12 @@ public class MaaProcessor
         EnqueueCommand(() => StartInternal(null, onlyStart, checkUpdate));
     }
 
-    public void Start(List<DragItemViewModel> dragItemViewModels, bool onlyStart = false, bool checkUpdate = false)
+    public void Start(List<DragItemViewModel> dragItemViewModels, bool onlyStart = false, bool checkUpdate = false, bool ignoreCheckedState = false)
     {
-        EnqueueCommand(() => StartInternal(dragItemViewModels, onlyStart, checkUpdate));
+        EnqueueCommand(() => StartInternal(dragItemViewModels, onlyStart, checkUpdate, ignoreCheckedState));
     }
 
-    private Task StartInternal(List<DragItemViewModel>? dragItemViewModels, bool onlyStart, bool checkUpdate)
+    private Task StartInternal(List<DragItemViewModel>? dragItemViewModels, bool onlyStart, bool checkUpdate, bool ignoreCheckedState = false)
     {
         using var logScope = BeginInstanceLogScope("StartTask", "Worker");
         // 保存当前的任务列表，以便在重新加载时保留用户调整的顺序和 check 状态
@@ -2653,7 +2653,7 @@ public class MaaProcessor
             }
             else
             {
-                tasks = FilterExecutableTasks(dragItemViewModels);
+                tasks = FilterExecutableTasks(dragItemViewModels, ignoreCheckedState);
             }
 
             _ = StartTask(tasks, onlyStart, checkUpdate);
@@ -2662,7 +2662,7 @@ public class MaaProcessor
         return Task.CompletedTask;
     }
 
-    private List<DragItemViewModel> FilterExecutableTasks(IEnumerable<DragItemViewModel>? source)
+    private List<DragItemViewModel> FilterExecutableTasks(IEnumerable<DragItemViewModel>? source, bool ignoreCheckedState = false)
     {
         var currentResourceName = ViewModel?.CurrentResource;
         var currentControllerName = ViewModel?.GetCurrentControllerName();
@@ -2682,7 +2682,7 @@ public class MaaProcessor
                        task.IsControllerSupported = task.SupportsController(currentControllerName);
                        task.IsTaskSupported = isSupported;
 
-                       return (task.IsChecked || task.IsCheckedWithNull == null) && isSupported;
+                       return (ignoreCheckedState || task.IsChecked || task.IsCheckedWithNull == null) && isSupported;
                    })
                    .ToList()
                     ?? new List<DragItemViewModel>();
