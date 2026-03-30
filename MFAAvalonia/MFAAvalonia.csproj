@@ -34,10 +34,10 @@
     <!-- Version -->
     <PropertyGroup>
         <ApplicationRevision>0</ApplicationRevision>
-        <ApplicationVersion>2.11.5</ApplicationVersion>
+        <ApplicationVersion>2.11.8</ApplicationVersion>
         <Version>1.1</Version>
-        <FileVersion>2.11.5</FileVersion>
-        <AssemblyVersion>2.11.5</AssemblyVersion>
+        <FileVersion>2.11.8</FileVersion>
+        <AssemblyVersion>2.11.8</AssemblyVersion>
         <InformationalVersion>0.0.1</InformationalVersion>
     </PropertyGroup>
 

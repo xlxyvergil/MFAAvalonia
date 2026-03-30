@@ -344,6 +344,10 @@ public class TaskLoader(MaaInterface? maaInterface, TaskQueueViewModel taskQueue
         IList<DragItemViewModel> drags,
         List<MaaInterface.MaaInterfaceTask> tasks)
     {
+        var instanceConfig = taskQueueViewModel.Processor.InstanceConfiguration;
+        var presetKey = instanceConfig.GetValue(ConfigurationKeys.InstancePresetKey, string.Empty);
+        var presetTaskNames = ResolvePresetTaskNames(presetKey);
+
         // 使用 HashSet 去重，解决 currentTasks 可能存在重复项的问题
         var currentTaskSet = new HashSet<string>(currentTasks);
 
@@ -419,6 +423,12 @@ public class TaskLoader(MaaInterface? maaInterface, TaskQueueViewModel taskQueue
             {
                 continue;
             }
+
+            if (presetTaskNames != null
+                && (string.IsNullOrWhiteSpace(task.Name) || !presetTaskNames.Contains(task.Name)))
+            {
+                continue;
+            }
     
             // 真正的新任务：不在 existingKeys 中，也不在 deletedTaskKeys 中
             var clonedTask = task.Clone();
@@ -434,6 +444,21 @@ public class TaskLoader(MaaInterface? maaInterface, TaskQueueViewModel taskQueue
 
         currentTasks = newCurrentTasks.ToList();
         return (updateList, removeList);
+    }
+
+    private HashSet<string>? ResolvePresetTaskNames(string? presetKey)
+    {
+        if (string.IsNullOrWhiteSpace(presetKey))
+            return null;
+
+        var preset = maaInterface?.Preset?.FirstOrDefault(p => string.Equals(p.Name, presetKey, StringComparison.Ordinal));
+        if (preset?.Task == null)
+            return new HashSet<string>(StringComparer.Ordinal);
+
+        return preset.Task
+            .Where(t => !string.IsNullOrWhiteSpace(t.Name))
+            .Select(t => t.Name!)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
 

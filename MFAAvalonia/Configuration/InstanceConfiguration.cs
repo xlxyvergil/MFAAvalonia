@@ -97,6 +97,13 @@ public sealed class InstanceConfiguration
         SaveInstanceConfig();
     }
 
+    public void RemoveValue(string key)
+    {
+        if (_isDeleted) return;
+        if (!_config.Remove(key)) return;
+        SaveInstanceConfig();
+    }
+
     public T GetValue<T>(string key, T defaultValue)
     {
         // 优先从实例独立配置读取

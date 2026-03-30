@@ -24,6 +24,7 @@ public static class ConfigurationKeys
     public const string ResourceOptionItems = "ResourceOptionItems";
     public const string GlobalOptionItems = "GlobalOptionItems";
     public const string ControllerOptionItems = "ControllerOptionItems";
+    public const string InstancePresetKey = "InstancePresetKey";
 
     #endregion
 
@@ -196,6 +197,7 @@ public static class ConfigurationKeys
     {
         TaskItems,
         CurrentTasks,
+        InstancePresetKey,
         ResourceOptionItems,
         ControllerOptionItems,
         BeforeTask,

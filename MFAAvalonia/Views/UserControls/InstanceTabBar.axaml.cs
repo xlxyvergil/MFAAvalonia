@@ -6,6 +6,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Lang.Avalonia.MarkupExtensions;
 using MFAAvalonia.Controls;
+using MFAAvalonia.Configuration;
 using MFAAvalonia.Extensions.MaaFW;
 using MFAAvalonia.Extensions;
 using MFAAvalonia.Helper;
@@ -247,6 +248,7 @@ public partial class InstanceTabBar : UserControl
 
         var newId = MaaProcessorManager.CreateInstanceId();
         sourceTab.Processor.InstanceConfiguration.CopyToNewInstance(newId);
+        new InstanceConfiguration(newId).RemoveValue(Configuration.ConfigurationKeys.InstancePresetKey);
 
         var processor = MaaProcessorManager.Instance.CreateInstance(newId, false);
         await Task.Run(() => processor.InitializeData());

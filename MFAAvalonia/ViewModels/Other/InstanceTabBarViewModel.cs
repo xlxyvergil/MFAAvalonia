@@ -520,6 +520,7 @@ public partial class InstanceTabBarViewModel : ViewModelBase
         {
             newId = MaaProcessorManager.CreateInstanceId();
             lastTab.Processor.InstanceConfiguration.CopyToNewInstance(newId);
+            var newInstanceConfig = new InstanceConfiguration(newId);
 
             if (preset != null && lastVm != null)
             {
@@ -531,7 +532,6 @@ public partial class InstanceTabBarViewModel : ViewModelBase
                     .Select(model => model.InterfaceItem)
                     .ToList();
 
-                var newInstanceConfig = new InstanceConfiguration(newId);
                 newInstanceConfig.SetValue(ConfigurationKeys.TaskItems, taskItemsWithoutSpecialTasks);
                 newInstanceConfig.SetValue(
                     ConfigurationKeys.CurrentTasks,
@@ -540,6 +540,10 @@ public partial class InstanceTabBarViewModel : ViewModelBase
                         .Select(task => $"{task!.Name}{TaskLoader.NEW_SEPARATOR}{task.Entry}")
                         .Distinct()
                         .ToList());
+            }
+            else
+            {
+                newInstanceConfig.RemoveValue(ConfigurationKeys.InstancePresetKey);
             }
         }
 

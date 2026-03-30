@@ -244,15 +244,23 @@ public partial class TaskQueueViewModel : ViewModelBase
 
             DispatcherHelper.RunOnMainThread(() =>
             {
-                CurrentResources = nextResources;
+                _isRefreshingResourceSelection = true;
+                try
+                {
+                    CurrentResources = nextResources;
 
-                if (!string.IsNullOrWhiteSpace(resourceToSelect) && CurrentResources.Any(r => r.Name == resourceToSelect))
-                {
-                    CurrentResource = resourceToSelect;
+                    if (!string.IsNullOrWhiteSpace(resourceToSelect) && CurrentResources.Any(r => r.Name == resourceToSelect))
+                    {
+                        CurrentResource = resourceToSelect;
+                    }
+                    else
+                    {
+                        CurrentResource = CurrentResources.FirstOrDefault()?.Name ?? "Default";
+                    }
                 }
-                else
+                finally
                 {
-                    CurrentResource = CurrentResources.FirstOrDefault()?.Name ?? "Default";
+                    _isRefreshingResourceSelection = false;
                 }
             });
         }
@@ -760,7 +768,23 @@ public partial class TaskQueueViewModel : ViewModelBase
             }
         }
 
-        Processor.InstanceConfiguration.SetValue(ConfigurationKeys.TaskItems, TaskItemViewModels.ToList().Select(model => model.InterfaceItem));
+        var savedTaskItems = TaskItemViewModels
+            .Where(model => !model.IsResourceOptionItem)
+            .Select(model => model.InterfaceItem)
+            .ToList();
+        var currentTaskKeys = savedTaskItems
+            .Where(task => !string.IsNullOrWhiteSpace(task?.Name) && !string.IsNullOrWhiteSpace(task.Entry))
+            .Select(task => $"{task!.Name}{TaskLoader.NEW_SEPARATOR}{task.Entry}")
+            .Distinct()
+            .ToList();
+
+        Processor.InstanceConfiguration.SetValue(ConfigurationKeys.TaskItems, savedTaskItems);
+        Processor.InstanceConfiguration.SetValue(ConfigurationKeys.CurrentTasks, currentTaskKeys);
+
+        if (!string.IsNullOrWhiteSpace(preset.Name))
+            Processor.InstanceConfiguration.SetValue(ConfigurationKeys.InstancePresetKey, preset.Name);
+        else
+            Processor.InstanceConfiguration.RemoveValue(ConfigurationKeys.InstancePresetKey);
     }
 
     private void RefreshPresetOptionRuntimeState(MaaInterface.MaaInterfaceSelectOption option)
@@ -2134,12 +2158,22 @@ public partial class TaskQueueViewModel : ViewModelBase
 
     [ObservableProperty] private ObservableCollection<MaaInterface.MaaInterfaceResource> _currentResources = [];
     private string _currentResource = string.Empty;
+    private bool _isRefreshingResourceSelection;
 
     public string CurrentResource
     {
         get => _currentResource;
         set
         {
+            // 重建资源列表时，ComboBox 可能先把 SelectedValue 瞬时回写为空，
+            // 若直接响应会误触发 SetTasker 并释放现有连接。
+            if (_isRefreshingResourceSelection
+                && string.IsNullOrWhiteSpace(value)
+                && !string.IsNullOrWhiteSpace(_currentResource))
+            {
+                return;
+            }
+
             if (string.Equals(_currentResource, value, StringComparison.Ordinal))
             {
                 return;
@@ -2581,11 +2615,19 @@ public partial class TaskQueueViewModel : ViewModelBase
                 {
                     if (Processor.HandleScreencapStatus(status))
                     {
-                        SetConnected(false);
-                        DispatcherHelper.PostOnMainThread(() =>
+                        if (Processor.IsMainControllerConnected())
                         {
-                            AddLogByKey(LangKeys.ScreencapTimeoutDisconnected, Brushes.OrangeRed, changeColor: false);
-                        });
+                            LoggerHelper.Warning("实时画面截图链路失效，但主控制器仍在线，准备重建截图任务执行器。");
+                            Processor.ResetLiveViewTasker();
+                        }
+                        else
+                        {
+                            SetConnected(false);
+                            DispatcherHelper.PostOnMainThread(() =>
+                            {
+                                AddLogByKey(LangKeys.ScreencapTimeoutDisconnected, Brushes.OrangeRed, changeColor: false);
+                            });
+                        }
                     }
                     return;
                 }

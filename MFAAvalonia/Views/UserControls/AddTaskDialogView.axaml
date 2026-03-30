@@ -165,7 +165,7 @@
                 <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasGroups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="settings:AddTaskItemGroupViewModel">
-                            <Border Classes="groupCard">
+                            <Border Classes="groupCard" Margin="0 2 0 2">
                                 <StackPanel Spacing="0">
                                     <ToggleButton IsChecked="{Binding IsExpanded}"
                                                   Classes="groupHeader">
