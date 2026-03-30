@@ -566,45 +566,9 @@ public partial class MaaInterface
 
             if (cloned == null) return "{}";
 
-            foreach (var preset in cloned.Values)
-            {
-                ProcessScanSelectPreset(preset, selectedValue);
-            }
+            ScanSelectUtils.ProcessScanSelectPipeline(cloned, Name, selectedValue);
 
             return JsonConvert.SerializeObject(cloned, Formatting.Indented);
-        }
-
-        /// <summary>
-        /// 处理 preset 对象，递归查找并更新 attach.option_name
-        /// </summary>
-        private void ProcessScanSelectPreset(Dictionary<string, JToken> preset, string selectedValue)
-        {
-            foreach (var key in preset.Keys.ToList())
-            {
-                var jToken = preset[key];
-                if (key == "attach" && jToken.Type == JTokenType.Object)
-                {
-                    var attachObj = (JObject)jToken;
-                    if (attachObj.ContainsKey(Name))
-                    {
-                        attachObj[Name] = JToken.FromObject(selectedValue);
-                    }
-                }
-                else if (jToken.Type == JTokenType.Object)
-                {
-                    var nestedObj = (JObject)jToken;
-                    var nestedDict = nestedObj.ToObject<Dictionary<string, JToken>>();
-                    if (nestedDict != null)
-                    {
-                        ProcessScanSelectPreset(nestedDict, selectedValue);
-                        // 更新原对象
-                        foreach (var nestedKey in nestedDict.Keys.ToList())
-                        {
-                            nestedObj[nestedKey] = nestedDict[nestedKey];
-                        }
-                    }
-                }
-            }
         }
     }
 
