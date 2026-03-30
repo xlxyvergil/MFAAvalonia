@@ -994,6 +994,29 @@ public class MaaProcessor
         }
     }
 
+    public bool IsMainControllerConnected()
+    {
+        try
+        {
+            return MaaTasker?.Controller?.IsConnected == true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"检查主控制器连接状态失败：{ex.Message}");
+            return false;
+        }
+    }
+
+    public void ResetLiveViewTasker()
+    {
+        ResetActionFailedCount();
+        DisposeScreenshotTasker();
+    }
+
     private bool IsAnyScreenshotRelatedWorkRunning(MaaController? controller)
     {
         return controller?.IsConnected == true || _screenshotTasker?.IsRunning == true || MaaTasker?.IsRunning == true;
