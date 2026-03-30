@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using MFAAvalonia.Helper;
 using Newtonsoft.Json.Linq;
 
 namespace MFAAvalonia.Extensions.MaaFW;
