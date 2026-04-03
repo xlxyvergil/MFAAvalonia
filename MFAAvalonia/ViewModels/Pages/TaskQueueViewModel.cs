@@ -144,6 +144,8 @@ public partial class TaskQueueViewModel : ViewModelBase
     /// 为 false 时表示用户通过 ComboBox 手动选择设备
     /// </summary>
     private bool _suppressAutoConnect = false;
+    private bool _lockCurrentAdbSelectionDuringRecovery = false;
+    private bool _suppressDeviceSelectionToast = false;
 
     /// <summary>
     /// 记录已应用过 interface.json 控制器设置的控制器类型，
@@ -1074,6 +1076,20 @@ public partial class TaskQueueViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(CurrentDeviceTooltipText))]
     private object? _currentDevice;
 
+    partial void OnDevicesChanged(ObservableCollection<object> value)
+    {
+        if (CurrentController != MaaControllerTypes.Adb)
+            return;
+
+        if (string.IsNullOrWhiteSpace(Processor.Config.AdbDevice.AdbSerial))
+            return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            SyncCurrentAdbSelectionToActiveConfig();
+        }, DispatcherPriority.Background);
+    }
+
     private static bool IsSelectableDevice(object? value) => value is AdbDeviceInfo or DesktopWindowInfo;
 
     private static EmptyDevicePlaceholder CreateEmptyDevicePlaceholder(MaaControllerTypes controllerType) =>
@@ -1081,9 +1097,101 @@ public partial class TaskQueueViewModel : ViewModelBase
             ? new EmptyDevicePlaceholder(LangKeys.PleaseSelectEmulator.ToLocalization(), LangKeys.NoEmulatorFoundPlaceholder.ToLocalization())
             : new EmptyDevicePlaceholder(LangKeys.PleaseSelectWindow.ToLocalization(), LangKeys.NoWindowFoundPlaceholder.ToLocalization());
 
+    private void ClearActiveAdbDeviceConfig()
+    {
+        Processor.Config.AdbDevice.Name = string.Empty;
+        Processor.Config.AdbDevice.AdbPath = "adb";
+        Processor.Config.AdbDevice.AdbSerial = string.Empty;
+        Processor.Config.AdbDevice.Config = "{}";
+        Processor.Config.AdbDevice.Info = null;
+    }
+
+    public void SetAdbRecoverySelectionLock(bool enabled)
+    {
+        _lockCurrentAdbSelectionDuringRecovery = enabled;
+    }
+
+    public void SyncCurrentAdbSelectionToActiveConfig()
+    {
+        if (CurrentController != MaaControllerTypes.Adb || string.IsNullOrWhiteSpace(Processor.Config.AdbDevice.AdbSerial))
+            return;
+
+        var matchedDevice = Devices.OfType<AdbDeviceInfo>().FirstOrDefault(device =>
+            string.Equals(device.AdbPath, Processor.Config.AdbDevice.AdbPath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(device.AdbSerial, Processor.Config.AdbDevice.AdbSerial, StringComparison.OrdinalIgnoreCase));
+
+        if (matchedDevice == null)
+        {
+            var currentDevices = MaaProcessor.Toolkit.AdbDevice.Find();
+            matchedDevice = currentDevices.FirstOrDefault(device =>
+                string.Equals(device.AdbPath, Processor.Config.AdbDevice.AdbPath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(device.AdbSerial, Processor.Config.AdbDevice.AdbSerial, StringComparison.OrdinalIgnoreCase));
+
+            if (matchedDevice != null)
+            {
+                DispatcherHelper.RunOnMainThread(() =>
+                {
+                    _suppressAutoConnect = true;
+                    try
+                    {
+                        Devices = new ObservableCollection<object>(currentDevices);
+                    }
+                    finally
+                    {
+                        _suppressAutoConnect = false;
+                    }
+                });
+            }
+        }
+
+        if (matchedDevice == null)
+            return;
+
+        ApplyCurrentDeviceSelection(matchedDevice);
+    }
+
+    private void ApplyCurrentDeviceSelection(object matchedDevice)
+    {
+        DispatcherHelper.RunOnMainThread(() =>
+        {
+            _suppressAutoConnect = true;
+            _suppressDeviceSelectionToast = true;
+            try
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    _suppressAutoConnect = true;
+                    _suppressDeviceSelectionToast = true;
+                    try
+                    {
+                        CurrentDevice = matchedDevice;
+                        OnPropertyChanged(nameof(CurrentDevice));
+                        OnPropertyChanged(nameof(CurrentDeviceTooltipText));
+                    }
+                    finally
+                    {
+                        _suppressDeviceSelectionToast = false;
+                        _suppressAutoConnect = false;
+                    }
+                }, DispatcherPriority.Background);
+            }
+            finally
+            {
+                _suppressDeviceSelectionToast = false;
+                _suppressAutoConnect = false;
+            }
+        });
+    }
+
     private void SetEmptyDeviceState(MaaControllerTypes? controllerType = null)
     {
-        var placeholder = CreateEmptyDevicePlaceholder(controllerType ?? CurrentController);
+        var resolvedControllerType = controllerType ?? CurrentController;
+        if (resolvedControllerType == MaaControllerTypes.Adb)
+        {
+            ClearActiveAdbDeviceConfig();
+        }
+
+        var placeholder = CreateEmptyDevicePlaceholder(resolvedControllerType);
         Devices = [placeholder];
         CurrentDevice = null;
     }
@@ -1148,7 +1256,7 @@ public partial class TaskQueueViewModel : ViewModelBase
     public void ChangedDevice(object? value)
     {
         if (_isSyncing) return;
-        var igoreToast = false;
+        var igoreToast = _suppressDeviceSelectionToast;
         if (value != null)
         {
             var now = DateTime.Now;
@@ -1783,7 +1891,14 @@ public partial class TaskQueueViewModel : ViewModelBase
                 else
                 {
                     Devices = devices;
-                    CurrentDevice = index >= 0 && index < devices.Count ? devices[index] : null;
+                    if (CurrentController == MaaControllerTypes.Adb && _lockCurrentAdbSelectionDuringRecovery)
+                    {
+                        LoggerHelper.Info("恢复已保存模拟器期间仅刷新设备列表，保留当前选中目标不变。");
+                    }
+                    else
+                    {
+                        CurrentDevice = index >= 0 && index < devices.Count ? devices[index] : null;
+                    }
                 }
             }
             finally
@@ -1990,12 +2105,20 @@ public partial class TaskQueueViewModel : ViewModelBase
             return;
         }
 
-        if (!allowAutoDetect)
+        var rememberAdb = Processor.InstanceConfiguration.GetValue(ConfigurationKeys.RememberAdb, true);
+        var hasSavedDevice = Processor.InstanceConfiguration.TryGetValue(ConfigurationKeys.AdbDevice, out AdbDeviceInfo savedDevice1,
+            new UniversalEnumConverter<AdbInputMethods>(), new UniversalEnumConverter<AdbScreencapMethods>());
+        var shouldKeepMatchingSavedDeviceStrictly = strictLaunchTarget
+            && CurrentController == MaaControllerTypes.Adb
+            && rememberAdb
+            && Processor.Config.AdbDevice.AdbPath == "adb"
+            && hasSavedDevice;
+
+        if (!allowAutoDetect && !shouldKeepMatchingSavedDeviceStrictly)
         {
             if (CurrentController != MaaControllerTypes.Adb
-                || !Processor.InstanceConfiguration.GetValue(ConfigurationKeys.RememberAdb, true)
-                || !Processor.InstanceConfiguration.TryGetValue(ConfigurationKeys.AdbDevice, out AdbDeviceInfo savedDevice,
-                    new UniversalEnumConverter<AdbInputMethods>(), new UniversalEnumConverter<AdbScreencapMethods>()))
+                || !rememberAdb
+                || !hasSavedDevice)
             {
                 DispatcherHelper.RunOnMainThread(() =>
                 {
@@ -2012,6 +2135,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                 return;
             }
 
+            var savedDevice = savedDevice1;
             DispatcherHelper.RunOnMainThread(() =>
             {
                 _suppressAutoConnect = true;
@@ -2025,20 +2149,10 @@ public partial class TaskQueueViewModel : ViewModelBase
                     _suppressAutoConnect = false;
                 }
             });
-            ChangedDevice(savedDevice);
             return;
         }
 
-        var rememberAdb = Processor.InstanceConfiguration.GetValue(ConfigurationKeys.RememberAdb, true);
-        var hasSavedDevice = Processor.InstanceConfiguration.TryGetValue(ConfigurationKeys.AdbDevice, out AdbDeviceInfo savedDevice1,
-            new UniversalEnumConverter<AdbInputMethods>(), new UniversalEnumConverter<AdbScreencapMethods>());
-        var shouldKeepMatchingSavedDeviceDuringStartup = strictLaunchTarget
-            && CurrentController == MaaControllerTypes.Adb
-            && rememberAdb
-            && Processor.Config.AdbDevice.AdbPath == "adb"
-            && hasSavedDevice;
-
-        if ((refresh && !shouldKeepMatchingSavedDeviceDuringStartup)
+        if ((refresh && !shouldKeepMatchingSavedDeviceStrictly)
             || CurrentController != MaaControllerTypes.Adb
             || !rememberAdb
             || Processor.Config.AdbDevice.AdbPath != "adb"
@@ -2053,15 +2167,15 @@ public partial class TaskQueueViewModel : ViewModelBase
             return;
         }
         // 检查是否启用指纹匹配功能
-        var useFingerprintMatching = shouldKeepMatchingSavedDeviceDuringStartup
+        var useFingerprintMatching = shouldKeepMatchingSavedDeviceStrictly
             || Processor.InstanceConfiguration.GetValue(ConfigurationKeys.UseFingerprintMatching, true);
 
         if (useFingerprintMatching)
         {
             // 使用指纹匹配设备，而不是直接使用保存的设备信息
             // 因为雷电模拟器等的AdbSerial每次启动都会变化
-            LoggerHelper.Info(shouldKeepMatchingSavedDeviceDuringStartup
-                ? "启动模拟器阶段检测到上次连接记录，持续按已保存设备指纹匹配 ADB 设备。"
+            LoggerHelper.Info(shouldKeepMatchingSavedDeviceStrictly
+                ? "严格匹配模式已启用，持续按已保存设备指纹匹配 ADB 设备。"
                 : "正在从配置中读取已保存的 ADB 设备，并启用指纹匹配。");
             LoggerHelper.Info($"已保存设备的指纹：{savedDevice1.GenerateDeviceFingerprint()}");
 
@@ -2077,15 +2191,15 @@ public partial class TaskQueueViewModel : ViewModelBase
                     _suppressAutoConnect = true;
                     try
                     {
+                        SetAdbRecoverySelectionLock(false);
                         Devices = new ObservableCollection<object>(currentDevices);
-                        CurrentDevice = preferredDevice;
                     }
                     finally
                     {
                         _suppressAutoConnect = false;
                     }
                 });
-                ChangedDevice(preferredDevice);
+                ApplyCurrentDeviceSelection(preferredDevice);
                 return;
             }
 
@@ -2097,8 +2211,7 @@ public partial class TaskQueueViewModel : ViewModelBase
                     _suppressAutoConnect = true;
                     try
                     {
-                        Devices = new ObservableCollection<object>(currentDevices);
-                        CurrentDevice = null;
+                        ClearActiveAdbDeviceConfig();
                     }
                     finally
                     {
@@ -2120,28 +2233,27 @@ public partial class TaskQueueViewModel : ViewModelBase
                     _suppressAutoConnect = true;
                     try
                     {
+                        SetAdbRecoverySelectionLock(false);
                         Devices = new ObservableCollection<object>(currentDevices);
-                        CurrentDevice = matchedDevice;
                     }
                     finally
                     {
                         _suppressAutoConnect = false;
                     }
                 });
-                ChangedDevice(matchedDevice);
+                ApplyCurrentDeviceSelection(matchedDevice);
             }
             else
             {
-                if (shouldKeepMatchingSavedDeviceDuringStartup)
+                if (shouldKeepMatchingSavedDeviceStrictly)
                 {
-                    LoggerHelper.Info("启动模拟器阶段暂未匹配到上次连接设备，保留等待并继续按指纹匹配。");
+                    LoggerHelper.Info("严格匹配模式下暂未匹配到已保存设备，保留等待并继续按指纹匹配。");
                     DispatcherHelper.RunOnMainThread(() =>
                     {
                         _suppressAutoConnect = true;
                         try
                         {
-                            Devices = new ObservableCollection<object>(currentDevices);
-                            CurrentDevice = null;
+                            ClearActiveAdbDeviceConfig();
                         }
                         finally
                         {
@@ -2178,7 +2290,6 @@ public partial class TaskQueueViewModel : ViewModelBase
                     _suppressAutoConnect = false;
                 }
             });
-            ChangedDevice(savedDevice1);
         }
     }
 

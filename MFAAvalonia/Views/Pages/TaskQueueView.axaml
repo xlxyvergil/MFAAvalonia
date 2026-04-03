@@ -495,7 +495,7 @@
                                   PlaceholderForeground="{DynamicResource SukiDisabledText}"
                                   MinWidth="100"
                                   HorizontalAlignment="Stretch"
-                                  SelectedValue="{Binding CurrentDevice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                  SelectedItem="{Binding CurrentDevice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                             <ComboBox.Styles>
                                 <Style Selector="ComboBox /template/ TextBlock#PlaceholderTextBlock">
                                     <Setter Property="Foreground" Value="{DynamicResource SukiDisabledText}" />
@@ -880,7 +880,7 @@
                                       PlaceholderForeground="{DynamicResource SukiDisabledText}"
                                       MinWidth="100"
                                       HorizontalAlignment="Stretch"
-                                      SelectedValue="{Binding CurrentDevice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                      SelectedItem="{Binding CurrentDevice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                                 <ComboBox.Styles>
                                     <Style Selector="ComboBox /template/ TextBlock#PlaceholderTextBlock">
                                         <Setter Property="Foreground" Value="{DynamicResource SukiDisabledText}" />

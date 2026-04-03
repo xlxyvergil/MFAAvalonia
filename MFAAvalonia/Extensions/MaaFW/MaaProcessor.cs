@@ -507,6 +507,7 @@ public class MaaProcessor
     public void Dispose()
     {
         _isClosed = true;
+        _detachedScreenshotTaskers.Clear();
         DispatcherHelper.RunOnMainThread(() => Processors.Remove(this));
         StopCommandThread();
     }
@@ -637,6 +638,7 @@ public class MaaProcessor
     private MaaTasker? _screenshotTasker;
     private Task<MaaTasker?>? _screenshotTaskerInitTask;
     private readonly Lock _screenshotTaskerInitLock = new();
+    private readonly List<MaaTasker> _detachedScreenshotTaskers = [];
     public MaaTasker? ScreenshotTasker => _screenshotTasker;
     public void SetTasker(MaaTasker? maaTasker = null)
     {
@@ -674,19 +676,35 @@ public class MaaProcessor
             _agentStarted = false;
             AgentHelper.KillAllAgents(_agentContexts, oldTasker);
             ViewModel?.SetConnected(false);
-            DisposeScreenshotTasker();
+            DetachScreenshotTasker();
         }
         else if (maaTasker == null)
         {
             // 即使主 Tasker 已经为空，也要确保截图 Tasker 被清理。
-            DisposeScreenshotTasker();
+            DetachScreenshotTasker();
         }
         else if (maaTasker != null)
         {
             MaaTasker = maaTasker;
-            DisposeScreenshotTasker();
+            DetachScreenshotTasker();
             ResetScreencapFailureLogFlags();
         }
+    }
+
+    private void DetachScreenshotTasker()
+    {
+        var screenshotTasker = _screenshotTasker;
+        _screenshotTasker = null;
+        lock (_screenshotTaskerInitLock)
+        {
+            _screenshotTaskerInitTask = null;
+        }
+
+        if (screenshotTasker == null)
+            return;
+
+        _detachedScreenshotTaskers.Add(screenshotTasker);
+        LoggerHelper.Warning("主连接上下文已变化，旧截图任务执行器已脱钩，等待按新连接重建。");
     }
 
     public MaaTasker? GetTasker(CancellationToken token = default)
@@ -739,7 +757,7 @@ public class MaaProcessor
             {
                 MaaTasker = initializedTasker;
                 // Ensure screenshot tasker is recreated from this processor's latest connection context.
-                DisposeScreenshotTasker();
+                DetachScreenshotTasker();
                 ResetScreencapFailureLogFlags();
                 await PrewarmScreenshotTaskerAsync(token);
             }
@@ -760,7 +778,7 @@ public class MaaProcessor
         {
             MaaTasker = tuple.Item1;
             // Ensure screenshot tasker is recreated from this processor's latest connection context.
-            DisposeScreenshotTasker();
+            DetachScreenshotTasker();
             ResetScreencapFailureLogFlags();
             await PrewarmScreenshotTaskerAsync(token);
         }
@@ -3212,6 +3230,8 @@ public class MaaProcessor
             var controllerType = ViewModel?.CurrentController ?? MaaControllerTypes.Adb;
             var isAdb = controllerType == MaaControllerTypes.Adb;
             var isPlayCover = controllerType == MaaControllerTypes.PlayCover;
+            var strictRecoveryTarget = isAdb && ShouldStrictMatchSavedAdbTarget();
+            ViewModel?.SetAdbRecoverySelectionLock(strictRecoveryTarget);
             var targetKey = controllerType switch
             {
                 MaaControllerTypes.Adb => LangKeys.Emulator,
@@ -3233,7 +3253,7 @@ public class MaaProcessor
             }
 
             if (!isPlayCover && ViewModel?.CurrentDevice == null && InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true) && !delayFingerprintMatching)
-                ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false);
+                ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false, strictRecoveryTarget);
 
             var tuple = await TryConnectAsync(token);
             var connected = tuple.Item1;
@@ -3262,10 +3282,17 @@ public class MaaProcessor
                 throw new Exception(ConnectionFailedAfterAllRetriesMessage);
             }
 
+            if (isAdb)
+            {
+                ViewModel?.SetAdbRecoverySelectionLock(false);
+                ViewModel?.SyncCurrentAdbSelectionToActiveConfig();
+            }
+
             ViewModel?.SetConnected(true);
         }
         finally
         {
+            ViewModel?.SetAdbRecoverySelectionLock(false);
             _suppressConnectionAttemptErrorToast = previousSuppressConnectionAttemptErrorToast;
             Interlocked.Exchange(ref _isConnecting, 0);
         }
@@ -3276,24 +3303,23 @@ public class MaaProcessor
         if (ViewModel == null)
             return;
 
+        var strictRecoveryTarget = ShouldStrictMatchSavedAdbTarget();
+
         if (InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true) && !delayFingerprintMatching)
         {
-            ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false);
-            var refreshedAdbDevice = ViewModel.CurrentDevice as AdbDeviceInfo;
-            if (!string.IsNullOrWhiteSpace(refreshedAdbDevice?.AdbSerial))
+            ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false, strictRecoveryTarget);
+            if (!string.IsNullOrWhiteSpace(Config.AdbDevice.AdbSerial))
                 return;
         }
 
-        var currentAdbDevice = ViewModel.CurrentDevice as AdbDeviceInfo;
-        var hasValidAdbSerial = !string.IsNullOrWhiteSpace(currentAdbDevice?.AdbSerial);
+        var hasValidAdbSerial = !string.IsNullOrWhiteSpace(Config.AdbDevice.AdbSerial);
         if (hasValidAdbSerial)
             return;
 
         if (InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true) && !delayFingerprintMatching)
         {
-            ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false);
-            currentAdbDevice = ViewModel.CurrentDevice as AdbDeviceInfo;
-            hasValidAdbSerial = !string.IsNullOrWhiteSpace(currentAdbDevice?.AdbSerial);
+            ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false, strictRecoveryTarget);
+            hasValidAdbSerial = !string.IsNullOrWhiteSpace(Config.AdbDevice.AdbSerial);
             if (hasValidAdbSerial)
                 return;
         }
@@ -3318,6 +3344,7 @@ public class MaaProcessor
     async private Task<bool> HandleAdbConnectionAsync(CancellationToken token, bool showMessage = true)
     {
         bool connected = false;
+        var strictRecoveryTarget = ShouldStrictMatchSavedAdbTarget();
         var retrySteps = new List<Func<CancellationToken, Task<bool>>>
         {
             async t =>
@@ -3333,7 +3360,8 @@ public class MaaProcessor
 
                 LoggerHelper.Warning("ADB 连接失败，正在尝试启动模拟器并刷新设备目标。");
                 return await RetryConnectionAsync(t, showMessage, StartSoftware, LangKeys.TryToStartEmulator, true,
-                    () => ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false, true));
+                    () => ViewModel?.TryReadAdbDeviceFromConfig(false, true,
+                        InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true), false, strictRecoveryTarget));
             },
             async t => await RetryConnectionAsync(t, showMessage, ReconnectByAdb, LangKeys.TryToReconnect),
             async t => await RetryConnectionAsync(t, showMessage, RestartAdb, LangKeys.RestartAdb, InstanceConfiguration.GetValue(ConfigurationKeys.AllowAdbRestart, true)),
@@ -3348,6 +3376,16 @@ public class MaaProcessor
         }
 
         return connected;
+    }
+
+    private bool ShouldStrictMatchSavedAdbTarget()
+    {
+        return (ViewModel?.CurrentController ?? MaaControllerTypes.Adb) == MaaControllerTypes.Adb
+               && InstanceConfiguration.GetValue(ConfigurationKeys.RememberAdb, true)
+               && InstanceConfiguration.TryGetValue(ConfigurationKeys.AdbDevice, out AdbDeviceInfo _,
+                   new UniversalEnumConverter<AdbInputMethods>(), new UniversalEnumConverter<AdbScreencapMethods>())
+               && InstanceConfiguration.GetValue(ConfigurationKeys.RetryOnDisconnected, false)
+               && CanStartSoftware(out _);
     }
 
     async private Task<bool> RetryConnectionAsync(CancellationToken token, bool showMessage, Func<Task> action, string logKey, bool enable = true, Action? other = null)
@@ -3531,6 +3569,7 @@ public class MaaProcessor
             if (Status == MFATask.MFATaskStatus.STOPPING)
                 return Task.CompletedTask;
             Status = MFATask.MFATaskStatus.STOPPING;
+            ViewModel?.SetAdbRecoverySelectionLock(false);
             DispatcherHelper.PostOnMainThread(() =>
             {
                 if (ViewModel != null) ViewModel.ToggleEnable = false;
@@ -3826,14 +3865,18 @@ public class MaaProcessor
 
     public async Task WaitSoftware()
     {
-        if (InstanceConfiguration.GetValue(ConfigurationKeys.BeforeTask, "None").Contains("Startup", StringComparison.OrdinalIgnoreCase))
+        var beforeTask = InstanceConfiguration.GetValue(ConfigurationKeys.BeforeTask, "None");
+        var isStartupMode = beforeTask.Contains("Startup", StringComparison.OrdinalIgnoreCase);
+
+        if (isStartupMode)
         {
             await StartSoftware();
         }
 
         if (ViewModel?.IsConnected != true)
         {
-            ViewModel?.TryReadAdbDeviceFromConfig(false, false, true, false);
+            var allowAutoDetect = InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true);
+            ViewModel?.TryReadAdbDeviceFromConfig(false, false, allowAutoDetect, false, isStartupMode);
         }
     }
     private CancellationTokenSource? _emulatorCancellationTokenSource;
@@ -3963,7 +4006,8 @@ public class MaaProcessor
 
                 if (ViewModel?.CurrentController != MaaControllerTypes.PlayCover)
                 {
-                    ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false, true);
+                    ViewModel?.TryReadAdbDeviceFromConfig(false, true,
+                        InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true), false, true);
                 }
 
                 var tuple = await TryConnectAsync(token);
