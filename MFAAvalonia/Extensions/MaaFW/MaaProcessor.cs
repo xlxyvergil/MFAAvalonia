@@ -507,7 +507,12 @@ public class MaaProcessor
     public void Dispose()
     {
         _isClosed = true;
-        _detachedScreenshotTaskers.Clear();
+        _detachedScreenshotCleanupCancellationTokenSource?.Cancel();
+        _detachedScreenshotCleanupCancellationTokenSource?.Dispose();
+        lock (_detachedScreenshotTaskersLock)
+        {
+            _detachedScreenshotTaskers.Clear();
+        }
         DispatcherHelper.RunOnMainThread(() => Processors.Remove(this));
         StopCommandThread();
     }
@@ -638,7 +643,18 @@ public class MaaProcessor
     private MaaTasker? _screenshotTasker;
     private Task<MaaTasker?>? _screenshotTaskerInitTask;
     private readonly Lock _screenshotTaskerInitLock = new();
-    private readonly List<MaaTasker> _detachedScreenshotTaskers = [];
+    private sealed class DetachedScreenshotTaskerRecord
+    {
+        public MaaTasker Tasker { get; init; } = null!;
+        public DateTime DetachedAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime NextCleanupAttemptUtc { get; set; } = DateTime.UtcNow.AddSeconds(15);
+        public int Attempts { get; set; }
+    }
+
+    private readonly List<DetachedScreenshotTaskerRecord> _detachedScreenshotTaskers = [];
+    private readonly Lock _detachedScreenshotTaskersLock = new();
+    private CancellationTokenSource? _detachedScreenshotCleanupCancellationTokenSource;
+    private Task? _detachedScreenshotCleanupTask;
     public MaaTasker? ScreenshotTasker => _screenshotTasker;
     public void SetTasker(MaaTasker? maaTasker = null)
     {
@@ -703,8 +719,111 @@ public class MaaProcessor
         if (screenshotTasker == null)
             return;
 
-        _detachedScreenshotTaskers.Add(screenshotTasker);
+        lock (_detachedScreenshotTaskersLock)
+        {
+            _detachedScreenshotTaskers.Add(new DetachedScreenshotTaskerRecord
+            {
+                Tasker = screenshotTasker
+            });
+        }
+        EnsureDetachedScreenshotTaskerCleanupLoop();
         LoggerHelper.Warning("主连接上下文已变化，旧截图任务执行器已脱钩，等待按新连接重建。");
+    }
+
+    private void EnsureDetachedScreenshotTaskerCleanupLoop()
+    {
+        lock (_detachedScreenshotTaskersLock)
+        {
+            if (_detachedScreenshotCleanupTask is { IsCompleted: false })
+                return;
+
+            _detachedScreenshotCleanupCancellationTokenSource?.Cancel();
+            _detachedScreenshotCleanupCancellationTokenSource?.Dispose();
+            _detachedScreenshotCleanupCancellationTokenSource = new CancellationTokenSource();
+            var token = _detachedScreenshotCleanupCancellationTokenSource.Token;
+            _detachedScreenshotCleanupTask = Task.Run(() => CleanupDetachedScreenshotTaskersLoopAsync(token), token);
+        }
+    }
+
+    private async Task CleanupDetachedScreenshotTaskersLoopAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            List<DetachedScreenshotTaskerRecord> snapshot;
+            lock (_detachedScreenshotTaskersLock)
+            {
+                snapshot = _detachedScreenshotTaskers.ToList();
+            }
+
+            if (snapshot.Count == 0)
+                return;
+
+            var nowUtc = DateTime.UtcNow;
+            foreach (var record in snapshot)
+            {
+                token.ThrowIfCancellationRequested();
+                if (record.NextCleanupAttemptUtc > nowUtc)
+                    continue;
+
+                if (TryDisposeDetachedScreenshotTasker(record))
+                {
+                    lock (_detachedScreenshotTaskersLock)
+                    {
+                        _detachedScreenshotTaskers.Remove(record);
+                    }
+                }
+                else
+                {
+                    record.Attempts++;
+                    var delaySeconds = Math.Min(60, 15 + record.Attempts * 10);
+                    record.NextCleanupAttemptUtc = DateTime.UtcNow.AddSeconds(delaySeconds);
+                }
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(5), token);
+        }
+    }
+
+    private bool TryDisposeDetachedScreenshotTasker(DetachedScreenshotTaskerRecord record)
+    {
+        var screenshotTasker = record.Tasker;
+
+        try
+        {
+            if (screenshotTasker.IsStopping)
+                return false;
+
+            if (screenshotTasker.IsRunning)
+            {
+                LoggerHelper.Info("延迟回收旧截图任务执行器：检测到仍在运行，稍后重试。");
+                return false;
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"检查旧截图任务执行器状态失败：{ex.Message}");
+            return false;
+        }
+
+        try
+        {
+            screenshotTasker.Dispose();
+            LoggerHelper.Info("延迟回收旧截图任务执行器成功。");
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"延迟回收旧截图任务执行器失败：{ex.Message}");
+            return false;
+        }
     }
 
     public MaaTasker? GetTasker(CancellationToken token = default)
