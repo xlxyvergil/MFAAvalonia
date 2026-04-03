@@ -2029,12 +2029,20 @@ public partial class TaskQueueViewModel : ViewModelBase
             return;
         }
 
-        if (refresh
+        var rememberAdb = Processor.InstanceConfiguration.GetValue(ConfigurationKeys.RememberAdb, true);
+        var hasSavedDevice = Processor.InstanceConfiguration.TryGetValue(ConfigurationKeys.AdbDevice, out AdbDeviceInfo savedDevice1,
+            new UniversalEnumConverter<AdbInputMethods>(), new UniversalEnumConverter<AdbScreencapMethods>());
+        var shouldKeepMatchingSavedDeviceDuringStartup = strictLaunchTarget
+            && CurrentController == MaaControllerTypes.Adb
+            && rememberAdb
+            && Processor.Config.AdbDevice.AdbPath == "adb"
+            && hasSavedDevice;
+
+        if ((refresh && !shouldKeepMatchingSavedDeviceDuringStartup)
             || CurrentController != MaaControllerTypes.Adb
-            || !Processor.InstanceConfiguration.GetValue(ConfigurationKeys.RememberAdb, true)
+            || !rememberAdb
             || Processor.Config.AdbDevice.AdbPath != "adb"
-            || !Processor.InstanceConfiguration.TryGetValue(ConfigurationKeys.AdbDevice, out AdbDeviceInfo savedDevice1,
-                new UniversalEnumConverter<AdbInputMethods>(), new UniversalEnumConverter<AdbScreencapMethods>()))
+            || !hasSavedDevice)
         {
             _refreshCancellationTokenSource?.Cancel();
             _refreshCancellationTokenSource = new CancellationTokenSource();
@@ -2045,13 +2053,16 @@ public partial class TaskQueueViewModel : ViewModelBase
             return;
         }
         // 检查是否启用指纹匹配功能
-        var useFingerprintMatching = Processor.InstanceConfiguration.GetValue(ConfigurationKeys.UseFingerprintMatching, true);
+        var useFingerprintMatching = shouldKeepMatchingSavedDeviceDuringStartup
+            || Processor.InstanceConfiguration.GetValue(ConfigurationKeys.UseFingerprintMatching, true);
 
         if (useFingerprintMatching)
         {
             // 使用指纹匹配设备，而不是直接使用保存的设备信息
             // 因为雷电模拟器等的AdbSerial每次启动都会变化
-            LoggerHelper.Info("正在从配置中读取已保存的 ADB 设备，并启用指纹匹配。");
+            LoggerHelper.Info(shouldKeepMatchingSavedDeviceDuringStartup
+                ? "启动模拟器阶段检测到上次连接记录，持续按已保存设备指纹匹配 ADB 设备。"
+                : "正在从配置中读取已保存的 ADB 设备，并启用指纹匹配。");
             LoggerHelper.Info($"已保存设备的指纹：{savedDevice1.GenerateDeviceFingerprint()}");
 
             // 搜索当前可用的设备
@@ -2121,6 +2132,25 @@ public partial class TaskQueueViewModel : ViewModelBase
             }
             else
             {
+                if (shouldKeepMatchingSavedDeviceDuringStartup)
+                {
+                    LoggerHelper.Info("启动模拟器阶段暂未匹配到上次连接设备，保留等待并继续按指纹匹配。");
+                    DispatcherHelper.RunOnMainThread(() =>
+                    {
+                        _suppressAutoConnect = true;
+                        try
+                        {
+                            Devices = new ObservableCollection<object>(currentDevices);
+                            CurrentDevice = null;
+                        }
+                        finally
+                        {
+                            _suppressAutoConnect = false;
+                        }
+                    });
+                    return;
+                }
+
                 // 没有找到匹配的设备，执行自动检测
                 LoggerHelper.Info("未通过指纹匹配到设备，开始自动检测。");
                 _refreshCancellationTokenSource?.Cancel();

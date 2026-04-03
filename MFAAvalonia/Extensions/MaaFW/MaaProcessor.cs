@@ -3311,7 +3311,7 @@ public class MaaProcessor
         await RetryConnectionAsync(token, showMessage, StartSoftware, LangKeys.TryToStartEmulator, true, () =>
         {
             if (InstanceConfiguration.GetValue(ConfigurationKeys.AutoDetectOnConnectionFailed, true))
-                ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false);
+                ViewModel.TryReadAdbDeviceFromConfig(false, true, true, false, true);
         });
     }
 
@@ -3333,7 +3333,7 @@ public class MaaProcessor
 
                 LoggerHelper.Warning("ADB 连接失败，正在尝试启动模拟器并刷新设备目标。");
                 return await RetryConnectionAsync(t, showMessage, StartSoftware, LangKeys.TryToStartEmulator, true,
-                    () => ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false));
+                    () => ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false, true));
             },
             async t => await RetryConnectionAsync(t, showMessage, ReconnectByAdb, LangKeys.TryToReconnect),
             async t => await RetryConnectionAsync(t, showMessage, RestartAdb, LangKeys.RestartAdb, InstanceConfiguration.GetValue(ConfigurationKeys.AllowAdbRestart, true)),
@@ -3948,48 +3948,58 @@ public class MaaProcessor
         };
         var deadline = DateTime.UtcNow + connectionWindow;
         var attempt = 0;
+        var previousSuppressConnectionAttemptErrorToast = _suppressConnectionAttemptErrorToast;
 
         AddLogByKey(LangKeys.WaitSoftwareTime, (IBrush?)null, true, true, targetKey, Math.Ceiling(connectionWindow.TotalSeconds).ToString("0"));
 
-        while (DateTime.UtcNow <= deadline)
+        _suppressConnectionAttemptErrorToast = true;
+
+        try
         {
-            token.ThrowIfCancellationRequested();
-            attempt++;
-
-            if (ViewModel?.CurrentController != MaaControllerTypes.PlayCover)
+            while (DateTime.UtcNow <= deadline)
             {
-                ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false, true);
+                token.ThrowIfCancellationRequested();
+                attempt++;
+
+                if (ViewModel?.CurrentController != MaaControllerTypes.PlayCover)
+                {
+                    ViewModel?.TryReadAdbDeviceFromConfig(false, true, true, false, true);
+                }
+
+                var tuple = await TryConnectAsync(token);
+                if (tuple.Item1)
+                {
+                    ViewModel?.SetConnected(true);
+                    AddLogByKey(LangKeys.StartupConnectSucceededDelay, (IBrush?)null, true, true, targetKey);
+                    LoggerHelper.Info($"启动后连接在第 {attempt} 次尝试时成功，继续执行前等待 5 秒。");
+                    await Task.Delay(TimeSpan.FromSeconds(5), token);
+                    return;
+                }
+
+                if (!tuple.Item3)
+                {
+                    LoggerHelper.Warning($"启动后连接在第 {attempt} 次尝试后停止重试，因为当前错误不可重试。");
+                    return;
+                }
+
+                var remainingSeconds = Math.Max(0, (int)Math.Ceiling((deadline - DateTime.UtcNow).TotalSeconds));
+                if (attempt == 1 || remainingSeconds <= 3 || remainingSeconds % 5 == 0)
+                {
+                    AddLogByKey(LangKeys.StartupConnectRetrying, (IBrush?)null, true, true, targetKey, remainingSeconds.ToString());
+                }
+                LoggerHelper.Info($"启动后连接第 {attempt} 次尝试失败，剩余重试窗口：{remainingSeconds} 秒。");
+
+                if (DateTime.UtcNow >= deadline)
+                    break;
+
+                await Task.Delay(1000, token);
             }
-
-            var tuple = await TryConnectAsync(token);
-            if (tuple.Item1)
-            {
-                ViewModel?.SetConnected(true);
-                AddLogByKey(LangKeys.StartupConnectSucceededDelay, (IBrush?)null, true, true, targetKey);
-                LoggerHelper.Info($"启动后连接在第 {attempt} 次尝试时成功，继续执行前等待 5 秒。");
-                await Task.Delay(TimeSpan.FromSeconds(5), token);
-                return;
-            }
-
-            if (!tuple.Item3)
-            {
-                LoggerHelper.Warning($"启动后连接在第 {attempt} 次尝试后停止重试，因为当前错误不可重试。");
-                return;
-            }
-
-            var remainingSeconds = Math.Max(0, (int)Math.Ceiling((deadline - DateTime.UtcNow).TotalSeconds));
-            if (attempt == 1 || remainingSeconds <= 3 || remainingSeconds % 5 == 0)
-            {
-                AddLogByKey(LangKeys.StartupConnectRetrying, (IBrush?)null, true, true, targetKey, remainingSeconds.ToString());
-            }
-            LoggerHelper.Info($"启动后连接第 {attempt} 次尝试失败，剩余重试窗口：{remainingSeconds} 秒。");
-
-            if (DateTime.UtcNow >= deadline)
-                break;
-
-            await Task.Delay(1000, token);
         }
-        
+        finally
+        {
+            _suppressConnectionAttemptErrorToast = previousSuppressConnectionAttemptErrorToast;
+        }
+
         LoggerHelper.Warning($"启动后连接等待窗口已超时：{Math.Max(0, waitTimeInSeconds):0.#} 秒。");
     }
 
