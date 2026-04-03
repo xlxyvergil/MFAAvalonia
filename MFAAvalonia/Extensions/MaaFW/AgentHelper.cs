@@ -1,8 +1,13 @@
 using MaaFramework.Binding;
 using MaaFramework.Binding.Custom;
 using MFAAvalonia.Configuration;
+using MFAAvalonia.Extensions;
 using MFAAvalonia.Helper;
+using MFAAvalonia.ViewModels.Pages;
+using MFAAvalonia.ViewModels.Windows;
 using Microsoft.Win32.SafeHandles;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -46,6 +51,14 @@ public class AgentContext
 public static class AgentHelper
 {
     private static readonly Random Random = new();
+    private const string PiInterfaceVersion = "v2.5.0";
+    private const string PiClientName = "MFAAvalonia";
+    private static readonly JsonSerializerSettings CompactJsonSettings = new()
+    {
+        Formatting = Formatting.None,
+        NullValueHandling = NullValueHandling.Ignore,
+        DefaultValueHandling = DefaultValueHandling.Ignore
+    };
 
     private static IDisposable PushAgentLogContext(MaaProcessor processor, string operation)
     {
@@ -181,6 +194,7 @@ public static class AgentHelper
         startInfo.Environment["MFA_INSTANCE_ID"] = processor.InstanceId;
         startInfo.Environment["MFA_INSTANCE_NAME"] =
             MaaProcessorManager.Instance.GetInstanceName(processor.InstanceId) ?? string.Empty;
+        ApplyPiEnvironmentVariables(startInfo, processor);
 
         LoggerHelper.Info(
             $"Agent 启动命令：{program} {(program!.Contains("python") && replacedArgs.Contains(".py") && !replacedArgs.Any(arg => arg.Contains("-u")) ? "-u " : "")}{string.Join(" ", replacedArgs)} {ctx.Client.Id} "
@@ -366,6 +380,101 @@ public static class AgentHelper
         }
 
         return ctx;
+    }
+
+    private static void ApplyPiEnvironmentVariables(ProcessStartInfo startInfo, MaaProcessor processor)
+    {
+        SetEnvironmentVariable(startInfo, "PI_INTERFACE_VERSION", PiInterfaceVersion);
+        SetEnvironmentVariable(startInfo, "PI_CLIENT_NAME", PiClientName);
+        SetEnvironmentVariable(startInfo, "PI_CLIENT_VERSION", RootViewModel.Version);
+        SetEnvironmentVariable(startInfo, "PI_CLIENT_LANGUAGE", NormalizePiLanguageCode(LanguageHelper.CurrentLanguage));
+        SetEnvironmentVariable(startInfo, "PI_CLIENT_MAAFW_VERSION", GetPiClientMaaFwVersion());
+        SetEnvironmentVariable(startInfo, "PI_VERSION", MaaProcessor.Interface?.Version);
+
+        var viewModel = processor.ViewModel;
+        SetEnvironmentVariable(startInfo, "PI_CONTROLLER", BuildControllerSnapshotJson(viewModel));
+        SetEnvironmentVariable(startInfo, "PI_RESOURCE", BuildResourceSnapshotJson(viewModel));
+    }
+
+    private static void SetEnvironmentVariable(ProcessStartInfo startInfo, string key, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        startInfo.Environment[key] = value;
+    }
+
+    private static string NormalizePiLanguageCode(string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+            return string.Empty;
+
+        return language.Replace('-', '_').ToLowerInvariant();
+    }
+
+    private static string GetPiClientMaaFwVersion()
+    {
+        try
+        {
+            return NativeBindingContext.LibraryVersion ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"读取 MaaFramework 版本失败：{ex.Message}");
+            return string.Empty;
+        }
+    }
+
+    private static string? BuildControllerSnapshotJson(TaskQueueViewModel? viewModel)
+    {
+        var controller = viewModel?.SelectedController;
+        if (controller == null)
+            return null;
+
+        var snapshot = JObject.FromObject(controller, JsonSerializer.CreateDefault(CompactJsonSettings));
+        ApplyLocalizedUiFields(snapshot, controller.Label, controller.Name, controller.Description);
+        return snapshot.ToString(Formatting.None);
+    }
+
+    private static string? BuildResourceSnapshotJson(TaskQueueViewModel? viewModel)
+    {
+        var resource = viewModel?.CurrentResources.FirstOrDefault(r =>
+            string.Equals(r.Name, viewModel.CurrentResource, StringComparison.Ordinal));
+        if (resource == null)
+            return null;
+
+        var snapshot = JObject.FromObject(resource, JsonSerializer.CreateDefault(CompactJsonSettings));
+        ApplyLocalizedUiFields(snapshot, resource.Label, resource.Name, resource.Description);
+        return snapshot.ToString(Formatting.None);
+    }
+
+    private static void ApplyLocalizedUiFields(JObject snapshot, string? label, string? fallbackName, string? description)
+    {
+        var finalLabel = LanguageHelper.GetLocalizedDisplayName(label, fallbackName ?? string.Empty);
+        if (!string.IsNullOrWhiteSpace(finalLabel))
+            snapshot["label"] = finalLabel;
+
+        var finalDescription = ResolveLocalizedDescription(description);
+        if (!string.IsNullOrWhiteSpace(finalDescription))
+            snapshot["description"] = finalDescription;
+        else
+            snapshot.Remove("description");
+    }
+
+    private static string ResolveLocalizedDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return string.Empty;
+
+        try
+        {
+            return LanguageHelper.GetLocalizedString(description.ResolveContentAsync().GetAwaiter().GetResult());
+        }
+        catch (Exception ex)
+        {
+            LoggerHelper.Warning($"解析 Agent 环境变量描述文本失败：{ex.Message}");
+            return string.Empty;
+        }
     }
 
     /// <summary>
