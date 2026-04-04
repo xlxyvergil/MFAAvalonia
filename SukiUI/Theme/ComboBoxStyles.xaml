@@ -1,4 +1,4 @@
-﻿<Styles xmlns="https://github.com/avaloniaui"
+<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:glassMorphism="clr-namespace:SukiUI.Controls.GlassMorphism"
         xmlns:objectModel="clr-namespace:System.Collections.ObjectModel;assembly=netstandard"
@@ -267,14 +267,14 @@
     <!-- </Style> -->
     <Style Selector="ComboBox /template/ Popup#PART_Popup">
         <Setter Property="MinWidth"
-                Value="{Binding Bounds.Width, RelativeSource={RelativeSource TemplatedParent}}" />
+                Value="{calcBinding:Binding 'Max(Bounds.Width, 150)', RelativeSource={RelativeSource TemplatedParent}}" />
     </Style>
     <Style Selector="ComboBox.LimitWidth /template/ Popup#PART_Popup">
         <Setter Property="MinWidth"
-                Value="{calcBinding:Binding 'Bounds.Width * 1.2', RelativeSource={RelativeSource TemplatedParent}}" />
+                Value="{calcBinding:Binding 'Max(Bounds.Width, 200)', RelativeSource={RelativeSource TemplatedParent}}" />
         
         <Setter Property="MaxWidth"
-                Value="{calcBinding:Binding 'Bounds.Width * 1.2', RelativeSource={RelativeSource TemplatedParent}}" />
+                Value="{calcBinding:Binding 'Max(Bounds.Width, 200) * 1.5', RelativeSource={RelativeSource TemplatedParent}}" />
     </Style>
 
     <Style Selector="ComboBox:pointerover /template/ suki|GlassCard#border">

@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
@@ -261,14 +261,23 @@ public static class ComboBoxExtensions
         if (item == null)
             return string.Empty;
 
+        var itemType = item.GetType();
+
         // 首先尝试使用SearchMemberPath附加属性
         var searchMemberPath = GetSearchMemberPath(comboBox);
         if (!string.IsNullOrEmpty(searchMemberPath))
         {
-            var property = item.GetType().GetProperty(searchMemberPath);
+            var property = itemType.GetProperty(searchMemberPath, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
             if (property != null)
             {
-                return property.GetValue(item)?.ToString() ?? string.Empty;
+                try
+                {
+                    return property.GetValue(item)?.ToString() ?? string.Empty;
+                }
+                catch
+                {
+                    // 忽略获取属性值时的异常
+                }
             }
         }
 
@@ -276,10 +285,17 @@ public static class ComboBoxExtensions
         if (comboBox.DisplayMemberBinding is Avalonia.Data.Binding binding
             && !string.IsNullOrEmpty(binding.Path))
         {
-            var property = item.GetType().GetProperty(binding.Path);
+            var property = itemType.GetProperty(binding.Path, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
             if (property != null)
             {
-                return property.GetValue(item)?.ToString() ?? string.Empty;
+                try
+                {
+                    return property.GetValue(item)?.ToString() ?? string.Empty;
+                }
+                catch
+                {
+                    // 忽略获取属性值时的异常
+                }
             }
         }
 
@@ -295,13 +311,20 @@ public static class ComboBoxExtensions
         };
         foreach (var propName in displayPropertyNames)
         {
-            var property = item.GetType().GetProperty(propName);
+            var property = itemType.GetProperty(propName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
             if (property != null)
             {
-                var value = property.GetValue(item)?.ToString();
-                if (!string.IsNullOrEmpty(value))
+                try
                 {
-                    return value;
+                    var value = property.GetValue(item)?.ToString();
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        return value;
+                    }
+                }
+                catch
+                {
+                    // 忽略获取属性值时的异常，继续尝试下一个属性
                 }
             }
         }
