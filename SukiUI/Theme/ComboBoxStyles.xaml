@@ -266,14 +266,12 @@
     <!--     </Style.Animations> -->
     <!-- </Style> -->
     <Style Selector="ComboBox /template/ Popup#PART_Popup">
-        <Setter Property="MinWidth"
-                Value="{calcBinding:Binding 'Max(Bounds.Width, 150)', RelativeSource={RelativeSource TemplatedParent}}" />
-        <Setter Property="MaxWidth" Value="400" />
+        <Setter Property="MinWidth" Value="300" />
+        <Setter Property="MaxWidth" Value="300" />
     </Style>
     <Style Selector="ComboBox.LimitWidth /template/ Popup#PART_Popup">
-        <Setter Property="MinWidth"
-                Value="{calcBinding:Binding 'Max(Bounds.Width, 150)', RelativeSource={RelativeSource TemplatedParent}}" />
-        <Setter Property="MaxWidth" Value="400" />
+        <Setter Property="MinWidth" Value="300" />
+        <Setter Property="MaxWidth" Value="300" />
     </Style>
 
     <Style Selector="ComboBox:pointerover /template/ suki|GlassCard#border">
