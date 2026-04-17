@@ -21,8 +21,8 @@ public static class ScanSelectUI
     /// </summary>
     public static Control CreateScanSelectControl(
         DragItemViewModel source,
-        MaaInterfaceOption interfaceOption,
-        MaaInterfaceSelectOption option,
+        MaaInterface.MaaInterfaceOption interfaceOption,
+        MaaInterface.MaaInterfaceSelectOption option,
         Action saveConfigurationAction)
     {
         var wrapper = new StackPanel();
@@ -47,7 +47,7 @@ public static class ScanSelectUI
 
         comboBox.SelectionChanged += (_, _) =>
         {
-            if (comboBox.SelectedItem is MaaInterfaceOptionCase selectedCase)
+            if (comboBox.SelectedItem is MaaInterface.MaaInterfaceOptionCase selectedCase)
             {
                 var selectedIndex = interfaceOption.Cases?.FindIndex(c => c.Name == selectedCase.Name) ?? -1;
                 if (selectedIndex >= 0)
@@ -103,8 +103,8 @@ public static class ScanSelectUI
 
     private static void UpdateComboBoxItems(
         ComboBox comboBox, 
-        MaaInterfaceOption option,
-        MaaInterfaceSelectOption selectOption)
+        MaaInterface.MaaInterfaceOption option,
+        MaaInterface.MaaInterfaceSelectOption selectOption)
     {
         var scanDir = option.ScanDir;
         if (string.IsNullOrEmpty(scanDir))
@@ -132,7 +132,7 @@ public static class ScanSelectUI
                 .Select(p => Path.GetFileNameWithoutExtension(p))
                 .Where(name => !string.IsNullOrEmpty(name))
                 .OrderBy(name => name)
-                .Select(name => new MaaInterfaceOptionCase
+                .Select(name => new MaaInterface.MaaInterfaceOptionCase
                 {
                     Name = name,
                     DisplayName = name
