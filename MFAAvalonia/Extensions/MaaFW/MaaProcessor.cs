@@ -3091,6 +3091,17 @@ public class MaaProcessor
                     selectOption.PipelineOverride = pipelineOverride;
                 }
 
+                // 处理 scan_select 类型
+                if (interfaceOption.IsScanSelect && selectOption.Data != null)
+                {
+                    var selectedValue = selectOption.Data.Values.FirstOrDefault();
+                    if (!string.IsNullOrEmpty(selectedValue))
+                    {
+                        pipelineOverride = ScanSelectCore.GeneratePipeline(interfaceOption, selectedValue);
+                        selectOption.PipelineOverride = pipelineOverride;
+                    }
+                }
+
                 if (!string.IsNullOrWhiteSpace(pipelineOverride) && pipelineOverride != "{}")
                 {
                     var param = JsonConvert.DeserializeObject<Dictionary<string, JToken>>(pipelineOverride);
