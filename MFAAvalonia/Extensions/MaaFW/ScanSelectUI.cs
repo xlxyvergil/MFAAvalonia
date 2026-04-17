@@ -211,9 +211,8 @@ public static class ScanSelectUI
                 
                 var caseOption = new MaaInterface.MaaInterfaceOptionCase
                 {
-                    Name = fileName,
-                    DisplayName = fileName,
-                    Value = relativePath
+                    Name = relativePath,  // 使用相对路径作为 Name（用于 pipeline_override 替换）
+                    Label = fileName      // 使用文件名作为显示标签
                 };
                 caseOption.InitializeDisplayName();
                 
@@ -418,7 +417,6 @@ public static class ScanSelectUI
         return new MaaInterface.MaaInterfaceSelectOption
         {
             Name = name,
-            DisplayName = name,
             Index = 0
         };
     }
