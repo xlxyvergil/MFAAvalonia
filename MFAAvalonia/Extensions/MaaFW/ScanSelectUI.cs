@@ -72,8 +72,19 @@ public static class ScanSelectUI
     private static void UpdateComboBoxItems(ComboBox comboBox, MaaInterface.MaaInterfaceOption option)
     {
         var scanDir = option.ScanDir;
-        if (string.IsNullOrEmpty(scanDir) || !Directory.Exists(scanDir))
+        if (string.IsNullOrEmpty(scanDir))
         {
+            comboBox.ItemsSource = option.Cases;
+            return;
+        }
+
+        // 解析相对路径（相对于程序根目录）
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var fullPath = Path.IsPathRooted(scanDir) ? scanDir : Path.Combine(baseDir, scanDir);
+        
+        if (!Directory.Exists(fullPath))
+        {
+            LoggerHelper.Error($"scan_select: 目录不存在: {fullPath}");
             comboBox.ItemsSource = option.Cases;
             return;
         }
@@ -82,8 +93,8 @@ public static class ScanSelectUI
         
         try
         {
-            var files = Directory.GetFiles(scanDir, filter, SearchOption.TopDirectoryOnly)
-                .Select(Path.GetFileNameWithoutExtension)
+            var files = Directory.GetFiles(fullPath, filter, SearchOption.TopDirectoryOnly)
+                .Select(p => Path.GetFileNameWithoutExtension(p))
                 .Where(name => !string.IsNullOrEmpty(name))
                 .OrderBy(name => name)
                 .Select(name => new MaaInterface.MaaInterfaceOptionCase
@@ -92,6 +103,11 @@ public static class ScanSelectUI
                     DisplayName = name
                 })
                 .ToList();
+
+            if (files.Count == 0)
+            {
+                LoggerHelper.Warning($"scan_select: 未找到匹配文件: {filter}");
+            }
 
             // 保留原有的默认选中状态
             var currentSelected = comboBox.SelectedItem as MaaInterface.MaaInterfaceOptionCase;
@@ -106,8 +122,9 @@ public static class ScanSelectUI
                 comboBox.SelectedIndex = 0;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            LoggerHelper.Error($"scan_select: 扫描失败: {ex.Message}");
             comboBox.ItemsSource = option.Cases;
         }
     }
