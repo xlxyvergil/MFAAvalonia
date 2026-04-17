@@ -703,11 +703,11 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
     }
 
     private Control CreateScanSelectControl(
-        MaaInterface.MaaInterfaceSelectOption option,
-        MaaInterface.MaaInterfaceOption interfaceOption,
+        MaaInterfaceSelectOption option,
+        MaaInterfaceOption interfaceOption,
         DragItemViewModel source)
     {
-        return ScanSelectUI.CreateScanSelectControl(source, interfaceOption);
+        return ScanSelectUI.CreateScanSelectControl(source, interfaceOption, option, saveConfigurationAction);
     }
 
     private Control CreateComboBoxControl(

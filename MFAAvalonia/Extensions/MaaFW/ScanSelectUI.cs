@@ -19,57 +19,90 @@ public static class ScanSelectUI
     /// </summary>
     public static Control CreateScanSelectControl(
         DragItemViewModel source,
-        MaaInterface.MaaInterfaceOption interfaceOption)
+        MaaInterfaceOption interfaceOption,
+        MaaInterfaceSelectOption option,
+        Action saveConfigurationAction)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var wrapper = new StackPanel();
+        var grid = TaskOptionGenerator.CreateBaseGrid();
 
-        // ComboBox
+        interfaceOption.Cases?.ForEach(c => c.InitializeDisplayName());
+        interfaceOption.InitializeIcon();
+
         var comboBox = new ComboBox
         {
-            MinWidth = 200,
-            HorizontalAlignment = HorizontalAlignment.Left
+            MinWidth = 120,
+            Classes = { "LimitWidth" },
+            Margin = new Thickness(0, 2, 0, 2),
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
 
-        // 绑定数据
-        UpdateComboBoxItems(comboBox, interfaceOption);
+        // 初始扫描并设置 ItemsSource
+        UpdateComboBoxItems(comboBox, interfaceOption, option);
 
-        // 绑定选中值
-        if (source.Option?.Data != null && source.Option.Data.ContainsKey(interfaceOption.Name ?? ""))
-        {
-            var currentValue = source.Option.Data[interfaceOption.Name ?? ""];
-            var selectedIndex = interfaceOption.Cases?.FindIndex(c => c.Name == currentValue) ?? -1;
-            if (selectedIndex >= 0)
-                comboBox.SelectedIndex = selectedIndex;
-        }
+        TaskOptionGenerator.BindIdleEnabled(comboBox);
+        TaskOptionGenerator.SetupComboBoxTemplate(comboBox);
 
         comboBox.SelectionChanged += (_, _) =>
         {
-            if (comboBox.SelectedItem is MaaInterface.MaaInterfaceOptionCase selectedCase)
+            if (comboBox.SelectedItem is MaaInterfaceOptionCase selectedCase)
             {
-                source.SetOption(interfaceOption.Name ?? "", selectedCase.Name ?? "");
+                var selectedIndex = interfaceOption.Cases?.FindIndex(c => c.Name == selectedCase.Name) ?? -1;
+                if (selectedIndex >= 0)
+                {
+                    option.Index = selectedIndex;
+                    // 存储选中的值到 Data
+                    option.Data ??= new System.Collections.Generic.Dictionary<string, string?>();
+                    option.Data[interfaceOption.Name ?? ""] = selectedCase.Name;
+                    saveConfigurationAction();
+                }
             }
         };
 
-        panel.Children.Add(comboBox);
+        ComboBoxExtensions.SetDisableNavigationOnLostFocus(comboBox, true);
+        ComboBoxExtensions.SetCanSearch(comboBox, true);
+        ComboBoxExtensions.SetSearchMemberPath(comboBox, "DisplayName");
+        comboBox.Bind(ComboBoxExtensions.SearchWatermarkProperty, new Lang.Avalonia.MarkupExtensions.I18nBinding(Lang.LangKeys.Search));
+
+        // Header
+        var labelPanel = TaskOptionGenerator.CreateLabelPanel(option.DisplayName, option.Name, interfaceOption.Description, interfaceOption.Document);
+        var icon = TaskOptionGenerator.CreateIcon(interfaceOption);
+        icon.Margin = new Thickness(10, 0, 6, 0);
+        labelPanel.Children.Insert(0, icon);
 
         // 刷新按钮
         var refreshButton = new Button
         {
-            Content = new SymbolIcon { Symbol = Symbol.Regular.ArrowSync24 },
-            ToolTip.Tip = "刷新扫描结果"
+            Content = new SymbolIcon { Symbol = FluentIcons.Common.Symbol.Regular.ArrowSync24 },
+            ToolTip.Tip = "刷新扫描结果",
+            Margin = new Thickness(8, 0, 0, 0)
         };
 
         refreshButton.Click += (_, _) =>
         {
-            UpdateComboBoxItems(comboBox, interfaceOption);
+            UpdateComboBoxItems(comboBox, interfaceOption, option);
+            saveConfigurationAction();
         };
 
-        panel.Children.Add(refreshButton);
+        Grid.SetColumn(labelPanel, 0);
+        Grid.SetColumn(comboBox, 1);
+        Grid.SetColumn(refreshButton, 2);
 
-        return panel;
+        TaskOptionGenerator.AddResponsiveBehavior(grid, labelPanel, comboBox);
+
+        grid.Children.Add(labelPanel);
+        grid.Children.Add(comboBox);
+        grid.Children.Add(refreshButton);
+
+        wrapper.Children.Add(grid);
+
+        return wrapper;
     }
 
-    private static void UpdateComboBoxItems(ComboBox comboBox, MaaInterface.MaaInterfaceOption option)
+    private static void UpdateComboBoxItems(
+        ComboBox comboBox, 
+        MaaInterfaceOption option,
+        MaaInterfaceSelectOption selectOption)
     {
         var scanDir = option.ScanDir;
         if (string.IsNullOrEmpty(scanDir))
@@ -97,7 +130,7 @@ public static class ScanSelectUI
                 .Select(p => Path.GetFileNameWithoutExtension(p))
                 .Where(name => !string.IsNullOrEmpty(name))
                 .OrderBy(name => name)
-                .Select(name => new MaaInterface.MaaInterfaceOptionCase
+                .Select(name => new MaaInterfaceOptionCase
                 {
                     Name = name,
                     DisplayName = name
@@ -109,17 +142,19 @@ public static class ScanSelectUI
                 LoggerHelper.Warning($"scan_select: 未找到匹配文件: {filter}");
             }
 
-            // 保留原有的默认选中状态
-            var currentSelected = comboBox.SelectedItem as MaaInterface.MaaInterfaceOptionCase;
+            // 更新 interface option 的 cases
+            option.Cases = files;
             comboBox.ItemsSource = files;
 
-            if (currentSelected != null && files.Any(f => f.Name == currentSelected.Name))
+            // 恢复选中状态
+            if (selectOption.Index.HasValue && selectOption.Index.Value >= 0 && selectOption.Index.Value < files.Count)
             {
-                comboBox.SelectedItem = files.First(f => f.Name == currentSelected.Name);
+                comboBox.SelectedIndex = selectOption.Index.Value;
             }
             else if (files.Count > 0)
             {
                 comboBox.SelectedIndex = 0;
+                selectOption.Index = 0;
             }
         }
         catch (Exception ex)
