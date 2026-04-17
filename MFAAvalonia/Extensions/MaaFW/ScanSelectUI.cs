@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
 using FluentIcons.Avalonia.Fluent;
-using MFAAvalonia.ViewModels.UsersControls;
+using MFAAvalonia.Helper.ValueType;
 using SukiUI.Extensions;
 using System;
 using System.IO;
