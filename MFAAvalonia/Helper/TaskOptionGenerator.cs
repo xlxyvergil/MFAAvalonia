@@ -187,6 +187,11 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         {
             control = CreateToggleControl(option, yes, no, interfaceOption, source);
         }
+        else if (interfaceOption.IsScanSelect)
+        {
+            // scan_select 类型：带刷新按钮的 ComboBox
+            control = CreateScanSelectControl(option, interfaceOption, source);
+        }
         else
         {
             control = CreateComboBoxControl(option, interfaceOption, source);
@@ -695,6 +700,14 @@ public class TaskOptionGenerator(TaskQueueViewModel viewModel, Action saveConfig
         wrapper.Children.Add(subOptionsBorder);
 
         return wrapper;
+    }
+
+    private Control CreateScanSelectControl(
+        MaaInterface.MaaInterfaceSelectOption option,
+        MaaInterface.MaaInterfaceOption interfaceOption,
+        DragItemViewModel source)
+    {
+        return ScanSelectUI.CreateScanSelectControl(source, interfaceOption);
     }
 
     private Control CreateComboBoxControl(
