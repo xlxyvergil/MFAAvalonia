@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -13,7 +14,7 @@ public static class ScanSelectCore
     /// 为 scan_select 类型生成处理后的 pipeline override
     /// 递归遍历 pipeline_override，对所有 attach.option_name 键赋值选中值
     /// </summary>
-    public static string GeneratePipeline(MaaInterfaceOption option, string selectedValue)
+    public static string GeneratePipeline(MaaInterface.MaaInterfaceOption option, string selectedValue)
     {
         if (option.PipelineOverride == null)
             return "{}";

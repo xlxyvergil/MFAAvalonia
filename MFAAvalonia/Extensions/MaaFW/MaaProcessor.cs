@@ -3097,7 +3097,7 @@ public class MaaProcessor
                     var selectedValue = selectOption.Data.Values.FirstOrDefault();
                     if (!string.IsNullOrEmpty(selectedValue))
                     {
-                        pipelineOverride = ScanSelectCore.GeneratePipeline(interfaceOption, selectedValue);
+                        pipelineOverride = ScanSelectCore.GeneratePipeline((MaaInterface.MaaInterfaceOption)interfaceOption, selectedValue);
                         selectOption.PipelineOverride = pipelineOverride;
                     }
                 }

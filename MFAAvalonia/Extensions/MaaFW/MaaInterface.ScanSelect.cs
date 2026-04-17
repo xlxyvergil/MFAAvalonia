@@ -17,5 +17,5 @@ public partial class MaaInterfaceOption
 
     /// <summary>是否为 scan_select 扫描选择类型</summary>
     [JsonIgnore]
-    public bool IsScanSelect => OptionType == "scan_select";
+    public bool IsScanSelect => Type?.ToLower() == "scan_select";
 }

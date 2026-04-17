@@ -1,7 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using FluentIcons.Avalonia.Fluent;
+using FluentIcons.Common;
 using Lang.Avalonia.MarkupExtensions;
+using MFAAvalonia.Helper;
 using MFAAvalonia.Helper.ValueType;
 using SukiUI.Extensions;
 using System;
@@ -26,7 +29,10 @@ public static class ScanSelectUI
         Action saveConfigurationAction)
     {
         var wrapper = new StackPanel();
-        var grid = TaskOptionGenerator.CreateBaseGrid();
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto")
+        };
 
         interfaceOption.Cases?.ForEach(c => c.InitializeDisplayName());
         interfaceOption.InitializeIcon();
@@ -42,9 +48,6 @@ public static class ScanSelectUI
         // 初始扫描并设置 ItemsSource
         UpdateComboBoxItems(comboBox, interfaceOption, option);
 
-        TaskOptionGenerator.BindIdleEnabled(comboBox);
-        TaskOptionGenerator.SetupComboBoxTemplate(comboBox);
-
         comboBox.SelectionChanged += (_, _) =>
         {
             if (comboBox.SelectedItem is MaaInterface.MaaInterfaceOptionCase selectedCase)
@@ -53,8 +56,7 @@ public static class ScanSelectUI
                 if (selectedIndex >= 0)
                 {
                     option.Index = selectedIndex;
-                    // 存储选中的值到 Data
-                    option.Data ??= new System.Collections.Generic.Dictionary<string, string?>();
+                    option.Data ??= new Dictionary<string, string?>();
                     option.Data[interfaceOption.Name ?? ""] = selectedCase.Name;
                     saveConfigurationAction();
                 }
@@ -64,21 +66,39 @@ public static class ScanSelectUI
         ComboBoxExtensions.SetDisableNavigationOnLostFocus(comboBox, true);
         ComboBoxExtensions.SetCanSearch(comboBox, true);
         ComboBoxExtensions.SetSearchMemberPath(comboBox, "DisplayName");
-        comboBox.Bind(ComboBoxExtensions.SearchWatermarkProperty, new Lang.Avalonia.MarkupExtensions.I18nBinding(Lang.LangKeys.Search));
+        comboBox.Bind(ComboBoxExtensions.SearchWatermarkProperty, new I18nBinding(LangKeys.Search));
 
         // Header
-        var labelPanel = TaskOptionGenerator.CreateLabelPanel(option.DisplayName, option.Name, interfaceOption.Description, interfaceOption.Document);
-        var icon = TaskOptionGenerator.CreateIcon(interfaceOption);
-        icon.Margin = new Thickness(10, 0, 6, 0);
-        labelPanel.Children.Insert(0, icon);
+        var labelPanel = new StackPanel { Orientation = Orientation.Horizontal };
+        var icon = new Image
+        {
+            Width = 24,
+            Height = 24,
+            Margin = new Thickness(10, 0, 6, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        
+        if (!string.IsNullOrEmpty(interfaceOption.ResolvedIcon))
+        {
+            icon.Source = new Avalonia.Media.Imaging.Bitmap(interfaceOption.ResolvedIcon);
+        }
+        
+        var textBlock = new TextBlock
+        {
+            Text = option.DisplayName,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        
+        labelPanel.Children.Add(icon);
+        labelPanel.Children.Add(textBlock);
 
         // 刷新按钮
         var refreshButton = new Button
         {
-            Content = new SymbolIcon { Symbol = FluentIcons.Common.Symbol.Regular.ArrowSync24 },
-            ToolTip.Tip = "刷新扫描结果",
+            Content = new SymbolIcon { Symbol = Symbol.ArrowSync },
             Margin = new Thickness(8, 0, 0, 0)
         };
+        ToolTip.SetTip(refreshButton, "刷新扫描结果");
 
         refreshButton.Click += (_, _) =>
         {
@@ -89,8 +109,6 @@ public static class ScanSelectUI
         Grid.SetColumn(labelPanel, 0);
         Grid.SetColumn(comboBox, 1);
         Grid.SetColumn(refreshButton, 2);
-
-        TaskOptionGenerator.AddResponsiveBehavior(grid, labelPanel, comboBox);
 
         grid.Children.Add(labelPanel);
         grid.Children.Add(comboBox);
