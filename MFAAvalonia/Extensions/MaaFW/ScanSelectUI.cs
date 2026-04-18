@@ -189,8 +189,8 @@ public static class ScanSelectUI
 
         try
         {
-            // 解析扫描目录（支持相对路径）
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            // 解析扫描目录（支持相对路径，相对于 DataRoot）
+            var baseDir = AppPaths.DataRoot;
             var scanDir = Path.IsPathRooted(interfaceOption.ScanDir) 
                 ? interfaceOption.ScanDir 
                 : Path.Combine(baseDir, interfaceOption.ScanDir);
